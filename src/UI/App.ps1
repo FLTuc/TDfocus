@@ -199,6 +199,7 @@ function Complete-TdCurrentNow {
     $script:Td.Data.history.Add((New-TdHistoryEntry $done))
     Save-TdHistoryNow
     if ($script:Td.EditingId -eq $done.id) { $script:Td.EditingId = $null }
+    if ($isCurrent) { $script:Td.NoteOpen = $false }
     if ($settings.completionSound) { Invoke-TdSoundEffect -Name 'complete' -Volume $settings.effectsVolume }
     $origin = $null
     if ($isCurrent) {
