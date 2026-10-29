@@ -66,6 +66,38 @@ jobs:
           $env:TDFOCUS_DATA = Join-Path $env:RUNNER_TEMP 'tdfocus-7'
           pwsh -NoProfile -ExecutionPolicy Bypass -STA -File src\TDfocus.ps1 -SmokeTest -Screenshot "$env:RUNNER_TEMP\captures-ps7"
           if ($LASTEXITCODE -ne 0) { throw "Test d'interface en échec ($LASTEXITCODE)" }
+      - name: Installation, démarrage automatique et désinstallation (profil utilisateur)
+        shell: powershell
+        run: |
+          $env:TDFOCUS_DATA = Join-Path $env:RUNNER_TEMP 'tdfocus-install'
+          .\Install-TDfocus.ps1 -NoLaunch -NoDesktopShortcut
+          $dest = Join-Path $env:LOCALAPPDATA 'Programs\TDfocus'
+          $app = Join-Path $dest 'src\TDfocus.ps1'
+          if (-not (Test-Path $app)) { throw "Application non copiée dans $dest" }
+          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          $command = (Get-ItemProperty -Path $runKey -Name TDfocus).TDfocus
+          Write-Host "Démarrage automatique : $command"
+          if ($command -notlike "*$app*" -or $command -notmatch '-Startup') { throw 'Clé Run incorrecte' }
+          $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'TDfocus.lnk'
+          if (-not (Test-Path $link)) { throw 'Raccourci du menu Démarrer absent' }
+
+          # La commande inscrite au démarrage lance bien l'application, qui reste ouverte.
+          $exe, $arguments = [regex]::Match($command, '^"([^"]+)"\s+(.*)$').Groups[1, 2].Value
+          $process = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru
+          Start-Sleep -Seconds 12
+          $log = Join-Path $env:TDFOCUS_DATA 'tdfocus.log'
+          if (Test-Path $log) { Get-Content $log | Write-Host }
+          if ($process.HasExited) { throw "TDfocus s'est arrêté au démarrage (code $($process.ExitCode))" }
+          if ((Test-Path $log) -and (Select-String -Path $log -Pattern 'Échec' -Quiet)) { throw 'Erreur au démarrage' }
+          if (-not (Test-Path (Join-Path $env:TDFOCUS_DATA 'state.json'))) { throw 'Aucune donnée enregistrée' }
+          Stop-Process -Id $process.Id -Force
+
+          .\Uninstall-TDfocus.ps1
+          Start-Sleep -Seconds 4
+          if ($null -ne (Get-ItemProperty -Path $runKey -Name TDfocus -ErrorAction Ignore)) { throw 'Clé Run restante' }
+          if (Test-Path $link) { throw 'Raccourci restant' }
+          if (Test-Path $dest) { throw 'Dossier d''installation restant' }
+          Write-Host 'Installation et désinstallation sans droits administrateur : OK'
       - name: Journal de l'application
         if: always()
         shell: pwsh
