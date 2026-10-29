@@ -77,8 +77,19 @@ function Get-TdLaunchArguments {
     $arguments
 }
 
-function Get-TdAutostartCommand {
+function Get-TdLauncherPath {
+    # Lanceur sans console (TDfocus.exe) installé à côté du dossier src, s'il existe.
     param([Parameter(Mandatory)][string]$ScriptPath)
+    $exe = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptPath)) 'TDfocus.exe'
+    if (Test-Path -LiteralPath $exe) { return $exe }
+    $null
+}
+
+function Get-TdAutostartCommand {
+    # Préfère TDfocus.exe (aucune console à l'écran) ; sinon powershell.exe masqué.
+    param([Parameter(Mandatory)][string]$ScriptPath)
+    $launcher = Get-TdLauncherPath -ScriptPath $ScriptPath
+    if ($launcher) { return ('"{0}" -Startup' -f $launcher) }
     '"{0}" {1}' -f (Get-TdPowerShellExe), (Get-TdLaunchArguments -ScriptPath $ScriptPath -Startup)
 }
 

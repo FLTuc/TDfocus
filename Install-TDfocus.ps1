@@ -4,6 +4,7 @@
 
 .DESCRIPTION
     - copie l'application dans %LOCALAPPDATA%\Programs\TDfocus ;
+    - compile le petit lanceur TDfocus.exe (aucune fenêtre de console au démarrage) ;
     - crée un raccourci dans le menu Démarrer (et, sauf -NoDesktopShortcut, sur le Bureau) ;
     - inscrit le lancement automatique à l'ouverture de session (HKCU\...\Run) ;
     - lance TDfocus.
@@ -21,6 +22,7 @@ $ErrorActionPreference = 'Stop'
 $source = $PSScriptRoot
 . (Join-Path $source 'src\Storage.ps1')
 . (Join-Path $source 'src\Platform\Windows.ps1')
+. (Join-Path $source 'src\Platform\Launcher.ps1')
 
 Write-Host ''
 Write-Host '  TDfocus - installation (sans droits administrateur)' -ForegroundColor Magenta
@@ -51,16 +53,26 @@ Get-ChildItem -LiteralPath $Destination -Recurse -File | Unblock-File -ErrorActi
 $appScript = Join-Path $Destination 'src\TDfocus.ps1'
 $icon = Join-Path $Destination 'assets\TDfocus.ico'
 
+$launcher = New-TdLauncher -Destination $Destination -IconPath $icon
+if ($launcher) { Write-Host "  Lanceur sans console : $launcher" }
+else { Write-Host '  Lanceur sans console indisponible : PowerShell sera lancé directement (bref flash possible).' -ForegroundColor Yellow }
+
 function New-TdShortcut {
     param([string]$Path)
     try {
         $shell = New-Object -ComObject WScript.Shell
         $link = $shell.CreateShortcut($Path)
-        $link.TargetPath = Get-TdPowerShellExe
-        $link.Arguments = Get-TdLaunchArguments -ScriptPath $appScript
+        if ($launcher) {
+            $link.TargetPath = $launcher
+            $link.Arguments = ''
+        }
+        else {
+            $link.TargetPath = Get-TdPowerShellExe
+            $link.Arguments = Get-TdLaunchArguments -ScriptPath $appScript
+            $link.WindowStyle = 7
+        }
         $link.WorkingDirectory = $Destination
         $link.IconLocation = "$icon,0"
-        $link.WindowStyle = 7
         $link.Description = 'TDfocus : une tâche à la fois, l''heure de fin sous les yeux'
         $link.Save()
         Write-Host "  Raccourci : $Path"
@@ -98,5 +110,6 @@ Write-Host "  Données personnelles : $(Get-TdDataDirectory)"
 Write-Host ''
 
 if (-not $NoLaunch) {
-    Start-Process -FilePath (Get-TdPowerShellExe) -ArgumentList (Get-TdLaunchArguments -ScriptPath $appScript) -WindowStyle Hidden
+    if ($launcher) { Start-Process -FilePath $launcher }
+    else { Start-Process -FilePath (Get-TdPowerShellExe) -ArgumentList (Get-TdLaunchArguments -ScriptPath $appScript) -WindowStyle Hidden }
 }

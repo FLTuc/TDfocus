@@ -466,6 +466,7 @@ function Update-TdCheckInView {
     if ($checkIn -and $current) {
         $ui.CheckInText.Text = 'Toujours sur « {0} » ?' -f (Limit-TdText $current.title 40)
         $ui.CheckInBar.Visibility = 'Visible'
+        $ui.CompactMeta.Text = 'Toujours dessus ?'
         foreach ($name in @('CompactCheckYes', 'CompactCheckDrift')) { $ui[$name].Visibility = 'Visible' }
         foreach ($name in @('CompactStartPause', 'CompactDone')) { $ui[$name].Visibility = 'Collapsed' }
     }
