@@ -356,6 +356,7 @@ function Set-TdFocusMode {
         $ui.ListScroll.Visibility = $collapsed
         foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $collapsed }
         $ui.MainColumn.RowDefinitions[0].Height = New-Object System.Windows.GridLength 1, ([System.Windows.GridUnitType]::Star)
+        $ui.MainColumn.RowDefinitions[2].Height = New-Object System.Windows.GridLength 0
         $ui.FocusCard.VerticalAlignment = 'Center'
         $ui.FocusCard.MaxWidth = 860
         $ui.MainColumn.Margin = New-Object System.Windows.Thickness 24, 8, 24, 40
@@ -367,6 +368,7 @@ function Set-TdFocusMode {
         $ui.ListScroll.Visibility = $visible
         foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $visible }
         $ui.MainColumn.RowDefinitions[0].Height = [System.Windows.GridLength]::Auto
+        $ui.MainColumn.RowDefinitions[2].Height = New-Object System.Windows.GridLength 1, ([System.Windows.GridUnitType]::Star)
         $ui.FocusCard.VerticalAlignment = 'Stretch'
         $ui.FocusCard.MaxWidth = [double]::PositiveInfinity
         $ui.MainColumn.Margin = New-Object System.Windows.Thickness 24, 8, 24, 0
@@ -386,6 +388,7 @@ function Set-TdCompactMode {
     if ($Enabled) {
         if ($w.WindowState -eq 'Maximized') { $w.WindowState = 'Normal' }
         $script:Td.NormalBounds = @{ Left = $w.Left; Top = $w.Top; Width = $w.Width; Height = $w.Height; MinWidth = $w.MinWidth; MinHeight = $w.MinHeight }
+        Hide-TdToast
         $ui.MainRoot.Visibility = 'Collapsed'
         $ui.CompactRoot.Visibility = 'Visible'
         $w.MinWidth = 0; $w.MinHeight = 0
@@ -833,7 +836,10 @@ function Invoke-TdTick {
         Show-TdWindow
     }
     Update-TdJobs
+    $preparing = 0
+    if ($script:TdAudio) { $preparing = $script:TdAudio.Jobs.Count }
     Update-TdAudio
+    if ($script:TdAudio -and $script:TdAudio.Jobs.Count -lt $preparing -and $script:Td.Drawer -eq 'sounds') { Update-TdDrawer }
 }
 
 function Update-TdJobs {

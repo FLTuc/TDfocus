@@ -292,7 +292,9 @@ function Build-TdNotesPanel {
         if ($note.context) { $meta += ' · pendant « {0} »' -f (Limit-TdText $note.context 30) }
         [void]$stack.Children.Add((New-TdText -Text $meta -Size 12 -Brush 'MutedBrush' -Margin '0,4,0,6'))
         $actions = New-TdPanel -Orientation Horizontal
-        [void]$actions.Children.Add((New-TdButton -Content 'En faire une tâche' -Style 'PillButton' -Margin '0,0,6,0' -Tag $note.id -OnClick { Convert-TdNoteToTask ([string]$this.Tag) }))
+        $convert = New-TdButton -Content 'En faire une tâche' -Style 'PillButton' -Margin '0,0,6,0' -Tag $note.id -OnClick { Convert-TdNoteToTask ([string]$this.Tag) }
+        $convert.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
+        [void]$actions.Children.Add($convert)
         [void]$actions.Children.Add((New-TdButton -Content 'Supprimer' -Style 'GhostButton' -Tag $note.id -OnClick { Remove-TdNoteNow ([string]$this.Tag) }))
         [void]$stack.Children.Add($actions)
         $card.Child = $stack
@@ -352,8 +354,10 @@ function Build-TdStatsPanel {
     $tiles = New-Object System.Windows.Controls.Primitives.UniformGrid
     $tiles.Columns = 2
     $tiles.Margin = New-Object System.Windows.Thickness 0, 12, 0, 0
+    $doneLabel = "tâches terminées aujourd'hui"
+    if ($stats.todayCount -le 1) { $doneLabel = "tâche terminée aujourd'hui" }
     foreach ($tile in @(
-            @{ Value = [string]$stats.todayCount; Label = "tâches terminées aujourd'hui" },
+            @{ Value = [string]$stats.todayCount; Label = $doneLabel },
             @{ Value = (Format-TdDurationMs $stats.todayFocusMs); Label = 'de concentration aujourd''hui' }
         )) {
         $card = New-TdCard -Margin '0,0,8,8'

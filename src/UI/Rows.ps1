@@ -200,7 +200,7 @@ function New-TdTaskRow {
             $subParts += 'Créneau figé à {0}' -f $Task.fixedStart
         }
     }
-    if ($Task.elapsedMs -gt 0) { $subParts += 'déjà {0}' -f (Format-TdDurationMs $Task.elapsedMs) }
+    if ($Task.elapsedMs -ge 60000) { $subParts += 'déjà {0}' -f (Format-TdDurationMs $Task.elapsedMs) }
     if ($Task.note) { $subParts += 'note' }
     if ($subParts.Count -gt 0) {
         $r.Sub.Text = $subParts -join ' · '

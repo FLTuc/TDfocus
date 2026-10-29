@@ -195,6 +195,7 @@ function Show-TdToast {
     # Message éphémère, avec action facultative (ex. « Annuler »).
     # L'action reçoit -Data en paramètre (pas de fermeture : les fonctions du script restent visibles).
     param([Parameter(Mandatory)][string]$Text, [string]$ActionText, [scriptblock]$Action, $Data, [int]$Seconds = 6)
+    if ($script:Td.Compact) { return }   # la barre compacte est trop petite pour un message
     $ui = $script:Td.Ui
     $ui.ToastText.Text = $Text
     $script:Td.ToastAction = $Action
