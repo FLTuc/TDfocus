@@ -1,7 +1,9 @@
 ﻿# TDfocus - outils de temps.
 # Toutes les heures sont stockées en millisecondes Unix (UTC) ; l'affichage se fait en heure locale.
 
-$script:TdCulture = [System.Globalization.CultureInfo]::GetCultureInfo('fr-FR')
+# Sans ICU (mode « InvariantGlobalization » de certains Linux), fr-FR n'existe pas : repli.
+try { $script:TdCulture = [System.Globalization.CultureInfo]::GetCultureInfo('fr-FR') }
+catch { $script:TdCulture = [System.Globalization.CultureInfo]::InvariantCulture }
 
 function Get-TdNowMs {
     [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()

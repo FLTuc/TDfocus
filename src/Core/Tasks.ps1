@@ -395,6 +395,8 @@ function Undo-TdComplete {
     $State.done.RemoveAt($found.index)
     $task.completedAt = $null
     $task.runningSince = $null
+    # Déjà commencée : elle revient « en pause depuis… » (sauf si le chrono lui est transféré).
+    if ([long]$task.elapsedMs -gt 0) { $task.pausedAt = $NowMs }
     $State.tasks.Insert(0, $task)
     Sync-TdState $State $NowMs
     $task

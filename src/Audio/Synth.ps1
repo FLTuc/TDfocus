@@ -22,7 +22,9 @@ $script:TdSoundCatalog = @{
 }
 
 function Get-TdSoundFileName {
-    param([Parameter(Mandatory)][string]$Name)
+    # -Seamless : variante d'ambiance bouclable sans fondu (lecteurs Linux / macOS).
+    param([Parameter(Mandatory)][string]$Name, [switch]$Seamless)
+    if ($Seamless) { return "$Name-seamless-v$($script:TdSoundVersion).wav" }
     "$Name-v$($script:TdSoundVersion).wav"
 }
 
@@ -93,8 +95,24 @@ function Set-TdLoopFades {
     }
 }
 
+function ConvertTo-TdSeamlessLoop {
+    # Boucle sans couture : la fin se fond (à puissance constante) dans le début.
+    # Entrée : N + F échantillons ; sortie : N échantillons qui se rebouclent sans saut.
+    param([Parameter(Mandatory)][double[]]$Samples, [Parameter(Mandatory)][int]$SampleRate, [double]$Seconds = $script:TdLoopFadeSeconds)
+    $f = [int]($Seconds * $SampleRate)
+    $n = $Samples.Length - $f
+    $out = New-Object 'double[]' $n
+    [Array]::Copy($Samples, $out, $n)
+    $halfPi = [Math]::PI / 2
+    for ($i = 0; $i -lt $f; $i++) {
+        $t = $halfPi * $i / $f
+        $out[$i] = $Samples[$i] * [Math]::Sin($t) + $Samples[$n + $i] * [Math]::Cos($t)
+    }
+    , $out
+}
+
 function New-TdNoiseSamples {
-    param([ValidateSet('white', 'pink', 'brown')][string]$Kind, [int]$SampleRate = 16000, [double]$Seconds = 16, [int]$Seed = 7)
+    param([ValidateSet('white', 'pink', 'brown')][string]$Kind, [int]$SampleRate = 16000, [double]$Seconds = 16, [int]$Seed = 7, [switch]$NoFades)
     $n = [int]($SampleRate * $Seconds)
     $out = New-Object 'double[]' $n
     $rnd = New-Object System.Random $Seed
@@ -132,13 +150,13 @@ function New-TdNoiseSamples {
     $target = 0.16
     if ($Kind -eq 'white') { $target = 0.12 }
     Set-TdNormalized -Samples $out -TargetRms $target
-    Set-TdLoopFades -Samples $out -SampleRate $SampleRate
+    if (-not $NoFades) { Set-TdLoopFades -Samples $out -SampleRate $SampleRate }
     , $out
 }
 
 function New-TdRainSamples {
     # Pluie douce : bruit rose adouci + gouttes aléatoires + légères rafales.
-    param([int]$SampleRate = 16000, [double]$Seconds = 18, [int]$Seed = 11)
+    param([int]$SampleRate = 16000, [double]$Seconds = 18, [int]$Seed = 11, [switch]$NoFades)
     $n = [int]($SampleRate * $Seconds)
     $out = New-Object 'double[]' $n
     $rnd = New-Object System.Random $Seed
@@ -167,7 +185,7 @@ function New-TdRainSamples {
         $out[$i] = $gust * $bed + 0.35 * ($dropNoise - $dropLp)
     }
     Set-TdNormalized -Samples $out -TargetRms 0.15
-    Set-TdLoopFades -Samples $out -SampleRate $SampleRate
+    if (-not $NoFades) { Set-TdLoopFades -Samples $out -SampleRate $SampleRate }
     , $out
 }
 
@@ -206,7 +224,7 @@ function Add-TdBell {
 
 function New-TdChimesSamples {
     # Carillon d'ambiance : notes pentatoniques aléatoires sur un léger souffle de vent.
-    param([int]$SampleRate = 22050, [double]$Seconds = 30, [int]$Seed = 5)
+    param([int]$SampleRate = 22050, [double]$Seconds = 30, [int]$Seed = 5, [switch]$NoFades)
     $n = [int]($SampleRate * $Seconds)
     $out = New-Object 'double[]' $n
     $rnd = New-Object System.Random $Seed
@@ -225,7 +243,7 @@ function New-TdChimesSamples {
         $t += 1.2 + 2.6 * $rnd.NextDouble()
     }
     Set-TdNormalized -Samples $out -TargetRms 0.08 -MaxPeak 0.6
-    Set-TdLoopFades -Samples $out -SampleRate $SampleRate
+    if (-not $NoFades) { Set-TdLoopFades -Samples $out -SampleRate $SampleRate }
     , $out
 }
 
@@ -272,15 +290,21 @@ function New-TdEffectSamples {
 
 function New-TdSoundFile {
     # Calcule le son $Name et l'écrit dans $Path. Renvoie la durée en secondes.
-    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Path)
+    # -Seamless : ambiance de 60 s bouclable telle quelle (pas de fondus à chevaucher).
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Path, [switch]$Seamless)
     $rate = 16000
+    $loop = @{}
+    if ($Seamless) { $loop = @{ Seconds = 60 + $script:TdLoopFadeSeconds; NoFades = $true } }
     switch ($Name) {
-        'white' { $samples = New-TdNoiseSamples -Kind white -SampleRate $rate }
-        'pink' { $samples = New-TdNoiseSamples -Kind pink -SampleRate $rate }
-        'brown' { $samples = New-TdNoiseSamples -Kind brown -SampleRate $rate }
-        'rain' { $samples = New-TdRainSamples -SampleRate $rate }
-        'chimes' { $rate = 22050; $samples = New-TdChimesSamples -SampleRate $rate }
+        'white' { $samples = New-TdNoiseSamples -Kind white -SampleRate $rate @loop }
+        'pink' { $samples = New-TdNoiseSamples -Kind pink -SampleRate $rate @loop }
+        'brown' { $samples = New-TdNoiseSamples -Kind brown -SampleRate $rate @loop }
+        'rain' { $samples = New-TdRainSamples -SampleRate $rate @loop }
+        'chimes' { $rate = 22050; $samples = New-TdChimesSamples -SampleRate $rate @loop }
         default { $rate = 22050; $samples = New-TdEffectSamples -Name $Name -SampleRate $rate }
+    }
+    if ($Seamless -and $script:TdSoundCatalog[$Name].Ambient) {
+        $samples = ConvertTo-TdSeamlessLoop -Samples $samples -SampleRate $rate
     }
     $bytes = ConvertTo-TdWavBytes -Samples $samples -SampleRate $rate
     $dir = Split-Path -Parent $Path

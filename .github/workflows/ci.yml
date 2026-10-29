@@ -7,7 +7,7 @@ on:
 
 jobs:
   core:
-    name: Cœur logique (PowerShell 7, Linux)
+    name: Cœur et version Linux (PowerShell 7)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +26,41 @@ jobs:
       - name: Tests Pester
         shell: pwsh
         run: Invoke-Pester -Path tests -CI
+      - name: Version Linux dans un vrai terminal (pseudo-terminal)
+        shell: bash
+        run: python3 tools/test_tui_pty.py
+      - name: Installation Linux sans root, lancement automatique et désinstallation
+        shell: bash
+        run: |
+          set -eu
+          export HOME="$RUNNER_TEMP/home"
+          unset XDG_CONFIG_HOME XDG_DATA_HOME
+          mkdir -p "$HOME"
+          sh install-linux.sh -NoLaunch
+          test -x "$HOME/.local/bin/tdfocus"
+          grep -qx "Exec=$HOME/.local/bin/tdfocus" "$HOME/.local/share/applications/tdfocus.desktop"
+          grep -qx "Exec=$HOME/.local/bin/tdfocus -Startup" "$HOME/.config/autostart/tdfocus.desktop"
+          "$HOME/.local/bin/tdfocus" -SmokeTest > "$RUNNER_TEMP/smoke.txt"
+          cat "$RUNNER_TEMP/smoke.txt"
+          grep -q "Qu'est-ce qui compte maintenant" "$RUNNER_TEMP/smoke.txt"
+
+          # Ouverture de session : lancé hors terminal, TDfocus s'ouvre dans un émulateur de terminal.
+          cat > "$RUNNER_TEMP/fake-term" <<EOF
+          #!/bin/sh
+          printf '%s\n' "\$@" > "$RUNNER_TEMP/term-args.txt"
+          EOF
+          chmod +x "$RUNNER_TEMP/fake-term"
+          DISPLAY=:0 TERMINAL="$RUNNER_TEMP/fake-term" "$HOME/.local/bin/tdfocus" -Startup < /dev/null
+          cat "$RUNNER_TEMP/term-args.txt"
+          grep -qx -- '-InTerminal' "$RUNNER_TEMP/term-args.txt"
+          grep -qx -- '-Startup' "$RUNNER_TEMP/term-args.txt"
+
+          sh uninstall-linux.sh
+          test ! -e "$HOME/.local/bin/tdfocus"
+          test ! -e "$HOME/.config/autostart/tdfocus.desktop"
+          test ! -e "$HOME/.local/share/TDfocus"
+          test -f "$HOME/.config/TDfocus/settings.json"
+          echo 'Installation, ouverture de session et désinstallation sans root : OK'
 
   windows:
     name: Windows (PowerShell 5.1 et 7, interface WPF)
