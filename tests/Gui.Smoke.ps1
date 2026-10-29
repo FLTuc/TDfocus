@@ -135,6 +135,48 @@ function Invoke-TdSmokeTest {
     $ui.TaskNoteBox.Text = 'Penser à joindre le devis'
     Assert-Td ($state.tasks[0].note -eq 'Penser à joindre le devis') 'note de tâche enregistrée'
 
+    # Sous-étapes
+    Open-TdEditor $state.tasks[0].id
+    $script:Td.EditorRefs.EditSteps.Text = "Ouvrir le document`nÉcrire le plan`nRelire"
+    Invoke-TdClick $script:Td.EditorRefs.EditSave
+    Assert-Td ($state.tasks[0].steps.Count -eq 3) 'sous-étapes saisies dans l''éditeur'
+    Assert-Td ($ui.StepPanel.Visibility -eq 'Visible' -and $ui.StepTitle.Text -eq 'Ouvrir le document') 'étape en cours affichée sur la carte'
+    Invoke-TdClick $ui.BtnStepDone
+    Assert-Td ($ui.StepTitle.Text -eq 'Écrire le plan' -and $ui.StepCounter.Text -like '*2 / 3*') 'étape faite : la suivante s''affiche'
+    Save-TdScreenshot '14-etapes'
+    Invoke-TdClick $ui.BtnStepUndo
+    Assert-Td ($ui.StepTitle.Text -eq 'Ouvrir le document') 'retour à l''étape précédente'
+
+    # Compteur de pause
+    Invoke-TdClick $ui.BtnStartPause
+    Wait-TdUi 1200
+    Assert-Td ($ui.CurrentState.Text -like 'En pause depuis*') "compteur de pause visible ($($ui.CurrentState.Text))"
+    Assert-Td ($w.Title -like '*en pause depuis*') 'pause visible dans le titre de la fenêtre'
+    Invoke-TdClick $ui.BtnStartPause
+    Assert-Td ($ui.CurrentState.Text -eq 'En cours') 'reprise : le compteur disparaît'
+
+    # Signal d'atterrissage
+    $cur = $state.tasks[0]
+    $cur.runningSince = [long]$cur.runningSince - 10 * 60000
+    $cur.plannedMs = (Get-TdElapsedMs $cur (Get-TdNowMs)) + 90000
+    $script:Td.Signals.LandingKey = ''
+    Wait-TdUi 500
+    Assert-Td ($script:Td.Signals.LandingKey -eq (Get-TdSignalKey $cur)) 'signal d''atterrissage émis'
+    Assert-Td ($ui.LandingHint.Visibility -eq 'Visible') "atterrissage affiché ($($ui.LandingHint.Text))"
+    Save-TdScreenshot '15-atterrissage'
+
+    # Point de contrôle au carillon
+    $script:Td.Data.settings.chimeEveryMin = 1
+    $script:Td.Signals.ChimeTaskId = $cur.id
+    $script:Td.Signals.ChimeIndex = [long][Math]::Floor((Get-TdElapsedMs $cur (Get-TdNowMs)) / 60000) - 1
+    Wait-TdUi 500
+    Assert-Td ($ui.CheckInBar.Visibility -eq 'Visible') 'point de contrôle affiché au carillon'
+    Save-TdScreenshot '16-point-de-controle'
+    Invoke-TdClick $ui.BtnCheckInDrift
+    Assert-Td ($script:Td.Data.checkins.Count -eq 1 -and $script:Td.Data.checkins[0].answer -eq 'drifted') 'recentrage enregistré'
+    Assert-Td ($ui.CheckInBar.Visibility -eq 'Collapsed' -and $ui.ToastAction.Content -eq 'Noter la distraction') 'proposition de noter la distraction'
+    $script:Td.Data.settings.chimeEveryMin = 0
+
     # Validation
     Invoke-TdClick $ui.BtnDone
     Assert-Td ($state.done.Count -eq 1 -and $script:Td.Data.history.Count -eq 1) 'validation : tâche terminée et historisée'
@@ -188,6 +230,28 @@ function Invoke-TdSmokeTest {
     Complete-TdImport
     Assert-Td ($null -ne ($state.tasks | Where-Object { $_.externalId -like 'ics:smoke:*' })) 'import iCalendar : créneau figé ajouté'
 
+    # Revue du matin (changement de jour simulé)
+    $state.dayKey = '2000-01-01'
+    Wait-TdUi 500
+    Assert-Td ($script:Td.Drawer -eq 'review') 'revue du matin ouverte au changement de jour'
+    $reviewTasks = @(Get-TdReviewTasks $state)
+    Assert-Td ($reviewTasks.Count -eq $state.tasks.Count) "toutes les tâches d'hier sont proposées ($($reviewTasks.Count))"
+    Save-TdScreenshot '17-revue'
+    $first = $reviewTasks[0]
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Tag -eq "tomorrow|$($first.id)" })
+    Assert-Td ($state.parked.Count -eq 1 -and $state.tasks.id -notcontains $first.id) 'tâche reportée à demain'
+    $second = $reviewTasks[1]
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Tag -eq "drop|$($second.id)" })
+    Assert-Td ($state.tasks.id -notcontains $second.id) 'tâche abandonnée sans culpabilité'
+    Invoke-TdClick $ui.ToastAction
+    Assert-Td ($state.tasks.id -contains $second.id) 'abandon annulé'
+    $keepAll = Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -like 'Tout garder*' }
+    Invoke-TdClick $keepAll
+    Assert-Td ($null -eq $script:Td.Drawer -and $state.review.Count -eq 0) '« Tout garder » termine la revue'
+    Assert-Td ($ui.ParkedBar.Visibility -eq 'Visible') 'tâches reportées signalées sous la liste'
+    Invoke-TdClick $ui.BtnParkedRestore
+    Assert-Td ($state.parked.Count -eq 0 -and $state.tasks.id -contains $first.id) 'tâche reportée ramenée aujourd''hui'
+
     # Statistiques, sons, réglages
     Invoke-TdClick $ui.BtnStats
     Assert-Td ($null -ne $ui.DrawerContent.Content) 'panneau Statistiques'
@@ -210,6 +274,11 @@ function Invoke-TdSmokeTest {
     Invoke-TdClick $ui.BtnCompact
     Assert-Td ($script:Td.Compact -and $ui.CompactRoot.Visibility -eq 'Visible') 'mode compact flottant'
     Save-TdScreenshot '11-compact'
+    Start-TdCheckIn
+    Assert-Td ($ui.CompactCheckYes.Visibility -eq 'Visible' -and $ui.CompactMeta.Text -eq 'Toujours dessus ?') 'point de contrôle en mode compact'
+    Save-TdScreenshot '18-compact-point-de-controle'
+    Invoke-TdClick $ui.CompactCheckYes
+    Assert-Td ($script:Td.Data.checkins[$script:Td.Data.checkins.Count - 1].answer -eq 'focused') 'réponse depuis le mode compact'
     Invoke-TdClick $ui.CompactExpand
     Assert-Td (-not $script:Td.Compact) 'retour à la vue complète'
     Invoke-TdClick $ui.BtnTheme
@@ -223,7 +292,7 @@ function Invoke-TdSmokeTest {
     # Sons calculés en arrière-plan (PowerShell pur)
     $deadline = (Get-Date).AddSeconds(240)
     while ($script:TdAudio.Jobs.Count -gt 0 -and (Get-Date) -lt $deadline) { Wait-TdUi 500 }
-    foreach ($name in @('complete', 'chime', 'timeup', 'rain')) {
+    foreach ($name in @('complete', 'chime', 'timeup', 'landing', 'rain')) {
         Assert-Td ((Get-TdSoundStatus $name) -eq 'ready') "son « $name » généré"
     }
 

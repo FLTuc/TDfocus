@@ -7,7 +7,8 @@
 
 $script:TdTaskFields = @(
     'id', 'title', 'plannedMs', 'estimateMs', 'categoryId', 'elapsedMs', 'runningSince',
-    'startedAt', 'completedAt', 'fixedStart', 'note', 'source', 'externalId', 'createdAt'
+    'startedAt', 'completedAt', 'fixedStart', 'note', 'source', 'externalId', 'createdAt',
+    'steps', 'pausedAt', 'deferUntil'
 )
 
 function New-TdId {
@@ -39,6 +40,26 @@ function ConvertTo-TdNullableString {
     $s = [string]$Value
     if ($s.Trim() -eq '') { return $null }
     $s
+}
+
+function ConvertTo-TdSteps {
+    # Sous-étapes : [{ id, title, done }]. Accepte aussi une simple liste de titres.
+    param($InputObject)
+    $steps = foreach ($item in @($InputObject)) {
+        if ($null -eq $item) { continue }
+        $done = $false
+        $id = $null
+        if ($item -is [string]) { $title = $item }
+        else {
+            $title = [string](Get-TdValue $item 'title')
+            $done = [bool](Get-TdValue $item 'done')
+            $id = ConvertTo-TdNullableString (Get-TdValue $item 'id')
+        }
+        if ([string]::IsNullOrWhiteSpace($title)) { continue }
+        if (-not $id) { $id = New-TdId }
+        [pscustomobject][ordered]@{ id = $id; title = $title.Trim(); done = $done }
+    }
+    , @($steps)
 }
 
 function ConvertTo-TdTask {
@@ -74,6 +95,9 @@ function ConvertTo-TdTask {
         source       = $source
         externalId   = ConvertTo-TdNullableString (Get-TdValue $InputObject 'externalId')
         createdAt    = [long]$created
+        steps        = ConvertTo-TdSteps (Get-TdValue $InputObject 'steps')
+        pausedAt     = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'pausedAt')
+        deferUntil   = ConvertTo-TdNullableString (Get-TdValue $InputObject 'deferUntil')
     }
 }
 
@@ -86,6 +110,7 @@ function New-TdTask {
         [string]$Source = 'manual',
         [string]$ExternalId,
         [string]$Note = '',
+        [string[]]$Steps = @(),
         [long]$NowMs = (Get-TdNowMs)
     )
     if ($Minutes -lt 1) { $Minutes = 1 }
@@ -100,6 +125,7 @@ function New-TdTask {
         externalId = $ExternalId
         note       = $Note
         createdAt  = $NowMs
+        steps      = @($Steps)
     }
 }
 
@@ -111,6 +137,8 @@ function New-TdState {
         planEndMs  = $null
         lastSeenMs = [long]0
         dayKey     = $null
+        parked     = [System.Collections.Generic.List[object]]::new()   # reportées à un autre jour
+        review     = [System.Collections.Generic.List[string]]::new()   # revue du matin en attente
     }
 }
 
@@ -127,6 +155,16 @@ function ConvertTo-TdState {
             $task.runningSince = $null
             $state.done.Add($task)
         }
+    }
+    foreach ($t in @(Get-TdValue $InputObject 'parked')) {
+        if ($null -ne $t) {
+            $task = ConvertTo-TdTask $t
+            $task.runningSince = $null
+            $state.parked.Add($task)
+        }
+    }
+    foreach ($id in @(Get-TdValue $InputObject 'review')) {
+        if ($id) { $state.review.Add([string]$id) }
     }
     $state.planEndMs = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'planEndMs')
     $lastSeen = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'lastSeenMs')
@@ -179,6 +217,7 @@ function Start-TdTaskClock {
     param([Parameter(Mandatory)]$Task, [Parameter(Mandatory)][long]$NowMs)
     if ($null -eq $Task.runningSince) { $Task.runningSince = $NowMs }
     if ($null -eq $Task.startedAt) { $Task.startedAt = $NowMs }
+    $Task.pausedAt = $null
 }
 
 function Sync-TdState {
@@ -194,7 +233,9 @@ function Sync-TdState {
             $transfer = $true
         }
     }
-    foreach ($t in $State.done) { $t.runningSince = $null }
+    foreach ($t in $State.done) { $t.runningSince = $null; $t.pausedAt = $null }
+    # Seule la tâche en cours peut être « en pause » : les autres sont simplement en attente.
+    for ($i = 1; $i -lt $State.tasks.Count; $i++) { $State.tasks[$i].pausedAt = $null }
     if ($transfer -and $State.tasks.Count -gt 0) {
         Start-TdTaskClock $State.tasks[0] $NowMs
     }
@@ -220,7 +261,24 @@ function Start-TdTimer {
 function Suspend-TdTimer {
     param([Parameter(Mandatory)]$State, [Parameter(Mandatory)][long]$NowMs)
     $current = Get-TdCurrentTask $State
-    if ($current) { Stop-TdTaskClock $current $NowMs }
+    if ($current -and $null -ne $current.runningSince) {
+        Stop-TdTaskClock $current $NowMs
+        $current.pausedAt = $NowMs
+    }
+}
+
+function Get-TdPausedMs {
+    # Durée de la pause en cours (compteur de pause visible), ou $null.
+    param([Parameter(Mandatory)]$Task, [Parameter(Mandatory)][long]$NowMs)
+    if ($null -ne $Task.runningSince -or $null -eq $Task.pausedAt) { return $null }
+    [Math]::Max([long]0, $NowMs - [long]$Task.pausedAt)
+}
+
+function Format-TdPausedFor {
+    # « depuis 40 s », « depuis 12 min », « depuis 1 h 05 »
+    param([Parameter(Mandatory)][long]$Ms)
+    if ($Ms -lt 60000) { return 'depuis {0} s' -f [long][Math]::Floor($Ms / 1000) }
+    'depuis ' + (Format-TdMinutes ([Math]::Floor($Ms / 60000)))
 }
 
 function Switch-TdTimer {
@@ -319,6 +377,7 @@ function Complete-TdTask {
     Stop-TdTaskClock $task $NowMs
     if ($null -eq $task.startedAt) { $task.startedAt = $NowMs }
     $task.completedAt = $NowMs
+    $task.pausedAt = $null
     $State.tasks.RemoveAt($index)
     $State.done.Add($task)
     if ($wasRunning -and $KeepRunning -and $State.tasks.Count -gt 0) {
@@ -379,7 +438,92 @@ function Update-TdTask {
     if ($Changes.ContainsKey('categoryId')) { $task.categoryId = ConvertTo-TdNullableString $Changes.categoryId }
     if ($Changes.ContainsKey('fixedStart')) { $task.fixedStart = ConvertTo-TdClockText (ConvertTo-TdNullableString $Changes.fixedStart) }
     if ($Changes.ContainsKey('note')) { $task.note = [string]$Changes.note }
+    if ($Changes.ContainsKey('stepsText')) { Set-TdTaskSteps -Task $task -Text ([string]$Changes.stepsText) }
     $task
+}
+
+# ---------------------------------------------------------------- sous-étapes
+
+function Get-TdCurrentStep {
+    param([Parameter(Mandatory)]$Task)
+    foreach ($step in @($Task.steps)) { if ($step -and -not $step.done) { return $step } }
+    $null
+}
+
+function Get-TdStepProgress {
+    param([Parameter(Mandatory)]$Task)
+    $steps = @($Task.steps | Where-Object { $null -ne $_ })
+    $done = @($steps | Where-Object { $_.done }).Count
+    [pscustomobject][ordered]@{
+        total   = $steps.Count
+        done    = $done
+        current = Get-TdCurrentStep $Task
+        index   = [Math]::Min($done + 1, $steps.Count)
+    }
+}
+
+function Complete-TdStep {
+    # Coche l'étape en cours de la tâche (par défaut la tâche en cours). Renvoie l'étape cochée.
+    param([Parameter(Mandatory)]$State, [string]$TaskId)
+    $task = Get-TdCurrentTask $State
+    if ($TaskId) { $found = Find-TdTask $State $TaskId; $task = $null; if ($found) { $task = $found.task } }
+    if (-not $task) { return $null }
+    $step = Get-TdCurrentStep $task
+    if ($step) { $step.done = $true }
+    $step
+}
+
+function Undo-TdStep {
+    # Décoche la dernière étape cochée.
+    param([Parameter(Mandatory)]$State, [string]$TaskId)
+    $task = Get-TdCurrentTask $State
+    if ($TaskId) { $found = Find-TdTask $State $TaskId; $task = $null; if ($found) { $task = $found.task } }
+    if (-not $task) { return $null }
+    $last = $null
+    foreach ($step in @($task.steps)) { if ($step -and $step.done) { $last = $step } }
+    if ($last) { $last.done = $false }
+    $last
+}
+
+function ConvertFrom-TdStepsText {
+    # Une étape par ligne (ou séparées par « ; »). « [x] » ou « ✓ » en tête = déjà faite.
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return , @() }
+    $lines = $Text -split '\r?\n'
+    if ($lines.Count -eq 1) { $lines = $Text -split ';' }
+    $items = foreach ($raw in $lines) {
+        $line = $raw.Trim()
+        if (-not $line) { continue }
+        $done = $false
+        if ($line -match '^(?:[-*+\u2022]\s*)?(?:\[[xX]\]|[\u2713\u2714\u2611\u2705])\s*(.*)$') { $done = $true; $line = $Matches[1] }
+        $line = $line -replace '^(?:[-*+\u2022]|\d{1,2}[.)])\s+', ''
+        $line = $line -replace '^(?:\[\s?\]|[\u2610\u25A1])\s*', ''
+        $line = $line.Trim()
+        if ($line) { [pscustomobject]@{ title = $line; done = $done } }
+    }
+    , @($items)
+}
+
+function ConvertTo-TdStepsText {
+    param([Parameter(Mandatory)]$Task)
+    $lines = foreach ($step in @($Task.steps)) {
+        if (-not $step) { continue }
+        if ($step.done) { '[x] ' + $step.title } else { $step.title }
+    }
+    @($lines) -join [Environment]::NewLine
+}
+
+function Set-TdTaskSteps {
+    # Remplace les étapes à partir d'un texte, en gardant l'identifiant des étapes inchangées.
+    param([Parameter(Mandatory)]$Task, [string]$Text)
+    $previous = @{}
+    foreach ($step in @($Task.steps)) { if ($step) { $previous[$step.title] = $step } }
+    $steps = foreach ($item in (ConvertFrom-TdStepsText $Text)) {
+        $id = $null
+        if ($previous.ContainsKey($item.title)) { $id = $previous[$item.title].id }
+        @{ id = $id; title = $item.title; done = $item.done }
+    }
+    $Task.steps = ConvertTo-TdSteps @($steps)
 }
 
 function Clear-TdPending {
@@ -406,7 +550,9 @@ function New-TdHistoryEntry {
 function Invoke-TdDayRollover {
     # Nouvelle journée : les tâches terminées les jours précédents quittent la vue
     # « Terminé aujourd'hui » (elles restent dans l'historique). Les tâches non faites
-    # restent dans la file : aucune perte, aucune culpabilisation.
+    # restent dans la file : aucune perte, aucune culpabilisation. Les tâches reportées
+    # dont le jour est arrivé reviennent, et tout ce qui reste d'hier est proposé à la
+    # revue du matin.
     param([Parameter(Mandatory)]$State, [Parameter(Mandatory)][long]$NowMs)
     $today = Get-TdDayKey $NowMs
     $removed = 0
@@ -417,8 +563,24 @@ function Invoke-TdDayRollover {
             $removed++
         }
     }
+    $returned = 0
+    for ($i = 0; $i -lt $State.parked.Count; ) {
+        $task = $State.parked[$i]
+        if (-not $task.deferUntil -or [string]::CompareOrdinal($task.deferUntil, $today) -le 0) {
+            $State.parked.RemoveAt($i)
+            $task.deferUntil = $null
+            $State.tasks.Add($task)
+            $returned++
+        }
+        else { $i++ }
+    }
+    $newDay = $State.dayKey -and $State.dayKey -ne $today
+    if ($newDay) {
+        $State.review.Clear()
+        foreach ($task in $State.tasks) { $State.review.Add([string]$task.id) }
+    }
     $State.dayKey = $today
-    $removed
+    [pscustomobject]@{ removed = $removed; returned = $returned; newDay = [bool]$newDay; review = $State.review.Count }
 }
 
 function Repair-TdStaleTimer {
@@ -437,5 +599,6 @@ function Repair-TdStaleTimer {
     if ($lastSeen -le 0 -or ($NowMs - $lastSeen) -le $MaxGapMs) { return $null }
     $stopAt = [Math]::Max([long]$task.runningSince, $lastSeen)
     Stop-TdTaskClock $task $stopAt
+    $task.pausedAt = $stopAt
     $stopAt
 }

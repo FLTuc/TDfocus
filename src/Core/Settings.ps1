@@ -6,6 +6,9 @@ function Get-TdDefaultSettings {
         timerMode         = 'countdown'  # countdown | countup
         autoStartNext     = $true        # la suivante démarre après validation si le minuteur tournait
         chimeEveryMin     = 0            # carillon périodique : 0 = désactivé
+        checkInWithChime  = $true        # point de contrôle « toujours sur ta tâche ? » à chaque carillon
+        landingMinutes    = 2            # signal d'atterrissage N minutes avant la fin : 0 = désactivé
+        morningReview     = $true        # revue du matin des tâches restées d'hier
         ambient           = 'none'       # none | white | pink | brown | rain | chimes
         ambientVolume     = 0.35
         chimeVolume       = 0.45
@@ -46,6 +49,7 @@ function ConvertTo-TdSettings {
     if (@('countdown', 'countup') -notcontains $settings.timerMode) { $settings.timerMode = 'countdown' }
     if (@('none', 'white', 'pink', 'brown', 'rain', 'chimes') -notcontains $settings.ambient) { $settings.ambient = 'none' }
     if ($settings.defaultMinutes -lt 1) { $settings.defaultMinutes = 25 }
+    if ($settings.landingMinutes -lt 0 -or $settings.landingMinutes -gt 15) { $settings.landingMinutes = 2 }
     $cats = foreach ($c in @($settings.categories)) {
         $id = ConvertTo-TdNullableString (Get-TdValue $c 'id')
         if (-not $id) { continue }

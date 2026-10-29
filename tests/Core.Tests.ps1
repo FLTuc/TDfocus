@@ -176,7 +176,7 @@ Describe 'Moteur séquentiel' {
     It 'garde les tâches non faites au changement de jour, sans culpabiliser' {
         Complete-TdTask -State $state -NowMs (At 9 5) | Out-Null
         $next = (At 9) + 24L * 3600 * 1000
-        Invoke-TdDayRollover -State $state -NowMs $next | Should -Be 1
+        (Invoke-TdDayRollover -State $state -NowMs $next).removed | Should -Be 1
         $state.done.Count | Should -Be 0
         $state.tasks.Count | Should -Be 2
     }

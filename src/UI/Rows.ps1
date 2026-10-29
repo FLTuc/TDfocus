@@ -63,6 +63,8 @@ $script:TdEditorXaml = @'
       </StackPanel>
     </WrapPanel>
     <WrapPanel x:Name="EditCategories" Margin="0,8,0,0"/>
+    <TextBlock Text="Sous-étapes (une par ligne, facultatif)" Margin="2,6,0,4" Foreground="{DynamicResource MutedBrush}"/>
+    <TextBox x:Name="EditSteps" Style="{DynamicResource Field}" Background="{DynamicResource SurfaceBrush}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" VerticalContentAlignment="Top" ToolTip="Découpe la tâche en petits pas : TDfocus n'affichera que l'étape en cours. « [x] » devant une étape = déjà faite."/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
       <Button x:Name="EditCancel" Style="{DynamicResource GhostButton}" Content="Annuler" Margin="0,0,6,0"/>
       <Button x:Name="EditSave" Style="{DynamicResource PrimaryButton}" Content="Enregistrer" Padding="18,7"/>
@@ -148,6 +150,12 @@ function Update-TdUpNext {
     $hasTasks = $count -gt 0
     $ui.BtnClearList.Visibility = $(if ($hasTasks) { 'Visible' } else { 'Collapsed' })
     $ui.BtnSaveAsTemplate.Visibility = $(if ($hasTasks) { 'Visible' } else { 'Collapsed' })
+    $parked = $state.parked.Count
+    if ($parked -gt 0) {
+        $ui.ParkedBar.Visibility = 'Visible'
+        $ui.ParkedText.Text = $(if ($parked -gt 1) { "$parked tâches reportées à demain" } else { '1 tâche reportée à demain' })
+    }
+    else { $ui.ParkedBar.Visibility = 'Collapsed' }
     $script:Td.StructureKey = Get-TdStructureKey $Schedule
 }
 
@@ -200,6 +208,8 @@ function New-TdTaskRow {
             $subParts += 'Créneau figé à {0}' -f $Task.fixedStart
         }
     }
+    $progress = Get-TdStepProgress $Task
+    if ($progress.total -gt 0) { $subParts += 'étapes {0}/{1}' -f $progress.done, $progress.total }
     if ($Task.elapsedMs -ge 60000) { $subParts += 'déjà {0}' -f (Format-TdDurationMs $Task.elapsedMs) }
     if ($Task.note) { $subParts += 'note' }
     if ($subParts.Count -gt 0) {
@@ -400,6 +410,7 @@ function New-TdEditor {
     $r.EditTitle.Text = $Task.title
     $r.EditMinutes.Text = [string][Math]::Round([long]$Task.plannedMs / 60000)
     $r.EditFixed.Text = [string]$Task.fixedStart
+    $r.EditSteps.Text = ConvertTo-TdStepsText $Task
     $r.EditSave.Tag = $Task.id
     $script:Td.EditorRefs = $r
     $script:Td.EditorCategory = $Task.categoryId
@@ -431,7 +442,7 @@ function Save-TdEditor {
     $r = $script:Td.EditorRefs
     if (-not $r) { return }
     $id = [string]$r.EditSave.Tag
-    $changes = @{ categoryId = $script:Td.EditorCategory }
+    $changes = @{ categoryId = $script:Td.EditorCategory; stepsText = $r.EditSteps.Text }
     $title = $r.EditTitle.Text.Trim()
     if ($title) { $changes.title = $title }
     $minutesText = $r.EditMinutes.Text.Trim().Replace(',', '.')

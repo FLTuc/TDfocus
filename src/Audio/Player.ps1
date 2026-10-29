@@ -35,7 +35,7 @@ function Initialize-TdAudio {
         }
     }
     # Les effets courts sont préparés tout de suite (quelques secondes, une seule fois).
-    foreach ($name in @('complete', 'chime', 'timeup')) { [void](Request-TdSound $name) }
+    foreach ($name in @('complete', 'chime', 'timeup', 'landing')) { [void](Request-TdSound $name) }
 }
 
 function Get-TdSoundPath {

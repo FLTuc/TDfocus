@@ -352,6 +352,13 @@
                   </StackPanel>
                 </Grid>
                 <StackPanel x:Name="FocusDetails" Grid.Column="1" VerticalAlignment="Center">
+                  <Border x:Name="CheckInBar" Visibility="Collapsed" CornerRadius="14" Padding="14,10,10,6" Margin="0,0,0,12" Background="{DynamicResource SuccessSoftBrush}">
+                    <WrapPanel>
+                      <TextBlock x:Name="CheckInText" Text="Toujours sur ta tâche ?" FontWeight="SemiBold" Foreground="{DynamicResource SuccessTextBrush}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,4"/>
+                      <Button x:Name="BtnCheckInYes" Style="{StaticResource PillButton}" Content="Oui, je suis dessus" Background="{DynamicResource SurfaceBrush}" Margin="0,0,6,4"/>
+                      <Button x:Name="BtnCheckInDrift" Style="{StaticResource PillButton}" Content="Je me suis égaré·e" Background="{DynamicResource SurfaceBrush}" Margin="0,0,0,4"/>
+                    </WrapPanel>
+                  </Border>
                   <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                     <Border x:Name="CurrentCategory" CornerRadius="999" Padding="10,3" Background="{DynamicResource SurfaceAltBrush}" Margin="0,0,8,0">
                       <TextBlock x:Name="CurrentCategoryText" Text="Travail" FontSize="12" FontWeight="SemiBold"/>
@@ -359,7 +366,30 @@
                     <TextBlock x:Name="CurrentState" Text="En pause" Foreground="{DynamicResource MutedBrush}" FontSize="12" VerticalAlignment="Center"/>
                   </StackPanel>
                   <TextBlock x:Name="CurrentTitle" Text="Tâche" FontFamily="{StaticResource DisplayFont}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                  <Border x:Name="StepPanel" Visibility="Collapsed" CornerRadius="14" Padding="14,10,10,10" Margin="0,2,0,10" Background="{DynamicResource AccentSoftBrush}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock x:Name="StepCounter" Text="ÉTAPE 1 / 3" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                        <TextBlock x:Name="StepTitle" Text="Étape" FontSize="16" TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="StepDots" Text="" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0"/>
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnStepUndo" Style="{StaticResource SmallIconButton}" Content="&#xE7A7;" ToolTip="Revenir à l'étape précédente" Margin="0,0,4,0"/>
+                        <Button x:Name="BtnStepDone" Style="{StaticResource PillButton}" Background="{DynamicResource SurfaceBrush}" ToolTip="Étape faite (S)">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource AccentBrush}"/>
+                            <TextBlock Text="Étape faite" VerticalAlignment="Center"/>
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
                   <TextBlock x:Name="CurrentMeta" Text="" Style="{StaticResource Muted}" FontSize="14" Margin="0,0,0,4"/>
+                  <TextBlock x:Name="LandingHint" Text="" Foreground="{DynamicResource AccentBrush}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,4"/>
                   <TextBlock x:Name="OvertimeHint" Text="" Foreground="{DynamicResource OvertimeBrush}" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,4"/>
                   <TextBlock x:Name="NextLine" Text="" Style="{StaticResource Muted}" Visibility="Collapsed" Margin="0,0,0,4"/>
                   <WrapPanel Margin="0,12,0,0">
@@ -460,6 +490,10 @@
               </Grid>
               <StackPanel x:Name="UpNextList"/>
               <TextBlock x:Name="UpNextEmpty" Text="Rien d'autre pour l'instant. C'est très bien comme ça." Style="{StaticResource Muted}" Margin="4,4,0,0"/>
+              <Grid x:Name="ParkedBar" Visibility="Collapsed" Margin="2,10,0,0">
+                <TextBlock x:Name="ParkedText" Text="" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                <Button x:Name="BtnParkedRestore" Style="{StaticResource GhostButton}" Content="Ramener aujourd'hui" FontSize="12" HorizontalAlignment="Right"/>
+              </Grid>
               <Button x:Name="BtnDoneToggle" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="-6,18,0,4" Padding="8,4">
                 <StackPanel Orientation="Horizontal">
                   <TextBlock x:Name="DoneChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -510,6 +544,8 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Cursor="Arrow">
+          <Button x:Name="CompactCheckYes" Style="{StaticResource PillButton}" Content="Oui" Visibility="Collapsed" Background="{DynamicResource SuccessSoftBrush}" Foreground="{DynamicResource SuccessTextBrush}" Padding="12,5" Margin="0,0,4,0" ToolTip="Toujours sur ma tâche"/>
+          <Button x:Name="CompactCheckDrift" Style="{StaticResource PillButton}" Content="Égaré·e" Visibility="Collapsed" Padding="12,5" Margin="0,0,4,0" ToolTip="Je me suis égaré·e : je reprends"/>
           <Button x:Name="CompactStartPause" Style="{StaticResource IconButton}" Content="&#xE768;" Foreground="{DynamicResource AccentBrush}" ToolTip="Démarrer / pause"/>
           <Button x:Name="CompactDone" Style="{StaticResource IconButton}" Content="&#xE73E;" Foreground="{DynamicResource SuccessTextBrush}" Background="{DynamicResource SuccessSoftBrush}" ToolTip="Terminé" Margin="4,0"/>
           <Button x:Name="CompactExpand" Style="{StaticResource IconButton}" Content="&#xE740;" ToolTip="Revenir à la vue complète"/>

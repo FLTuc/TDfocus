@@ -112,19 +112,31 @@ function Import-TdData {
     foreach ($n in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'notes.json')) 'items')) {
         if ($null -ne $n) { $notes.Add((ConvertTo-TdNote $n)) }
     }
-    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes }
+    $checkins = [System.Collections.Generic.List[object]]::new()
+    foreach ($c in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'checkins.json')) 'items')) {
+        if ($null -ne $c) { $checkins.Add((ConvertTo-TdCheckIn $c)) }
+    }
+    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes; checkins = $checkins }
+}
+
+function ConvertTo-TdStateRecord {
+    # Forme enregistrée de la file (state.json et sauvegardes).
+    param([Parameter(Mandatory)]$State)
+    [ordered]@{
+        version    = 1
+        tasks      = @($State.tasks)
+        done       = @($State.done)
+        parked     = @($State.parked)
+        review     = @($State.review)
+        planEndMs  = $State.planEndMs
+        lastSeenMs = $State.lastSeenMs
+        dayKey     = $State.dayKey
+    }
 }
 
 function Save-TdState {
     param([Parameter(Mandatory)]$State)
-    Write-TdJsonFile (Get-TdDataPath 'state.json') ([ordered]@{
-            version    = 1
-            tasks      = @($State.tasks)
-            done       = @($State.done)
-            planEndMs  = $State.planEndMs
-            lastSeenMs = $State.lastSeenMs
-            dayKey     = $State.dayKey
-        })
+    Write-TdJsonFile (Get-TdDataPath 'state.json') (ConvertTo-TdStateRecord $State)
 }
 
 function Save-TdSettings {
@@ -147,6 +159,11 @@ function Save-TdNotes {
     Write-TdJsonFile (Get-TdDataPath 'notes.json') ([ordered]@{ version = 1; items = @($Notes) })
 }
 
+function Save-TdCheckIns {
+    param([AllowEmptyCollection()]$CheckIns)
+    Write-TdJsonFile (Get-TdDataPath 'checkins.json') ([ordered]@{ version = 1; items = @($CheckIns) })
+}
+
 function Export-TdBackup {
     # Sauvegarde complète dans un seul fichier JSON.
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)]$Data)
@@ -157,11 +174,12 @@ function Export-TdBackup {
             app       = 'TDfocus'
             version   = 1
             exportedAt = (Get-Date).ToString('o')
-            state     = [ordered]@{ tasks = @($Data.state.tasks); done = @($Data.state.done); planEndMs = $Data.state.planEndMs; lastSeenMs = $Data.state.lastSeenMs; dayKey = $Data.state.dayKey }
+            state     = ConvertTo-TdStateRecord $Data.state
             settings  = $settings
             history   = @($Data.history)
             templates = @($Data.templates)
             notes     = @($Data.notes)
+            checkins  = @($Data.checkins)
         })
 }
 
@@ -175,11 +193,14 @@ function Import-TdBackup {
     foreach ($t in @(Get-TdValue $raw 'templates')) { if ($null -ne $t) { $templates.Add((ConvertTo-TdTemplate $t)) } }
     $notes = [System.Collections.Generic.List[object]]::new()
     foreach ($n in @(Get-TdValue $raw 'notes')) { if ($null -ne $n) { $notes.Add((ConvertTo-TdNote $n)) } }
+    $checkins = [System.Collections.Generic.List[object]]::new()
+    foreach ($c in @(Get-TdValue $raw 'checkins')) { if ($null -ne $c) { $checkins.Add((ConvertTo-TdCheckIn $c)) } }
     @{
         state     = ConvertTo-TdState (Get-TdValue $raw 'state')
         settings  = ConvertTo-TdSettings (Get-TdValue $raw 'settings')
         history   = $history
         templates = $templates
         notes     = $notes
+        checkins  = $checkins
     }
 }

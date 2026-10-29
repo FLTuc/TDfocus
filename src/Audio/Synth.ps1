@@ -18,6 +18,7 @@ $script:TdSoundCatalog = @{
     chime    = @{ Ambient = $false }
     complete = @{ Ambient = $false }
     timeup   = @{ Ambient = $false }
+    landing  = @{ Ambient = $false }
 }
 
 function Get-TdSoundFileName {
@@ -229,7 +230,7 @@ function New-TdChimesSamples {
 }
 
 function New-TdEffectSamples {
-    param([ValidateSet('chime', 'complete', 'timeup')][string]$Name, [int]$SampleRate = 22050)
+    param([ValidateSet('chime', 'complete', 'timeup', 'landing')][string]$Name, [int]$SampleRate = 22050)
     switch ($Name) {
         'chime' {
             # Carillon périodique : une cloche discrète pour sortir de la rêverie.
@@ -242,6 +243,14 @@ function New-TdEffectSamples {
             $freqs = @(1046.5, 1318.51, 1567.98, 2093.0)
             for ($k = 0; $k -lt $freqs.Length; $k++) {
                 Add-TdBell -Buffer $out -SampleRate $SampleRate -StartSeconds (0.01 + 0.075 * $k) -Frequency $freqs[$k] -Amplitude (0.22 - 0.02 * $k) -DecaySeconds 0.45 -Ratios @(1.0, 2.0, 3.0) -Gains @(1.0, 0.25, 0.08)
+            }
+        }
+        'landing' {
+            # Atterrissage : trois notes descendantes très douces, « on se pose ».
+            $out = New-Object 'double[]' ([int](2.6 * $SampleRate))
+            $freqs = @(880.0, 783.99, 659.25)
+            for ($k = 0; $k -lt $freqs.Length; $k++) {
+                Add-TdBell -Buffer $out -SampleRate $SampleRate -StartSeconds (0.02 + 0.32 * $k) -Frequency $freqs[$k] -Amplitude 0.16 -DecaySeconds 0.9 -Ratios @(1.0, 2.0) -Gains @(1.0, 0.2)
             }
         }
         'timeup' {

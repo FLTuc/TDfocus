@@ -2,6 +2,7 @@
 # Un seul niveau : chaque bouton de l'en-tête ouvre directement son panneau.
 
 $script:TdDrawerTitles = @{
+    review    = 'Revue du matin'
     sounds    = 'Sons et carillons'
     templates = 'Routines'
     notes     = 'Bloc-notes'
@@ -19,6 +20,7 @@ $script:TdChartColors = @{
 function Show-TdDrawer {
     param([Parameter(Mandatory)][string]$Name, [switch]$Force)
     if ($script:Td.Drawer -eq $Name -and -not $Force) { Close-TdDrawer; return }
+    if ($script:Td.Drawer -eq 'review' -and $Name -ne 'review') { Close-TdDrawer }
     if ($script:Td.Compact) { Set-TdCompactMode $false }
     if ($script:Td.FocusMode) { Set-TdFocusMode $false }
     $script:Td.Drawer = $Name
@@ -29,6 +31,11 @@ function Show-TdDrawer {
 }
 
 function Close-TdDrawer {
+    # Quitter la revue du matin garde pour aujourd'hui tout ce qui n'a pas été trié.
+    if ($script:Td.Drawer -eq 'review' -and (Get-TdState).review.Count -gt 0) {
+        Clear-TdReview (Get-TdState)
+        Save-TdStateNow
+    }
     $script:Td.Drawer = $null
     $script:Td.Ui.Drawer.Visibility = 'Collapsed'
     $script:Td.Ui.DrawerContent.Content = $null
@@ -39,6 +46,7 @@ function Update-TdDrawer {
     if (-not $name) { return }
     $panel = New-TdPanel
     switch ($name) {
+        'review' { Build-TdReviewPanel $panel }
         'sounds' { Build-TdSoundsPanel $panel }
         'templates' { Build-TdTemplatesPanel $panel }
         'notes' { Build-TdNotesPanel $panel }
@@ -93,6 +101,52 @@ function New-TdLabeledRow {
     $grid
 }
 
+# ---------------------------------------------------------------- revue du matin
+
+function Build-TdReviewPanel {
+    param($Panel)
+    $state = Get-TdState
+    $settings = Get-TdSettings
+    $tasks = @(Get-TdReviewTasks $state)
+    Add-TdSection $Panel 'Nouvelle journée' 'Voici ce qui reste d''hier. Pour chaque tâche : la garder pour aujourd''hui, la reporter à demain, ou l''abandonner. Abandonner est un choix tout à fait valable.'
+    if ($tasks.Count -eq 0) {
+        [void]$Panel.Children.Add((New-TdText -Text 'Tout est trié. Belle journée !' -Size 14 -Margin '2,6,0,0'))
+        return
+    }
+    foreach ($task in $tasks) {
+        $card = New-TdCard
+        $stack = New-TdPanel
+        [void]$stack.Children.Add((New-TdText -Text $task.title -Bold -Wrap))
+        $meta = @('prévu ' + (Format-TdDurationMs $task.plannedMs))
+        $category = Get-TdCategory $settings $task.categoryId
+        if ($category) { $meta += '{0} {1}' -f $category.emoji, $category.name }
+        $progress = Get-TdStepProgress $task
+        if ($progress.total -gt 0) { $meta += 'étapes {0}/{1}' -f $progress.done, $progress.total }
+        if ($task.fixedStart) { $meta += "créneau d'hier à {0}" -f $task.fixedStart }
+        [void]$stack.Children.Add((New-TdText -Text ($meta -join ' · ') -Size 12 -Brush 'MutedBrush' -Wrap -Margin '0,2,0,8'))
+        $actions = New-TdPanel -Wrap
+        $keep = New-TdButton -Content "Garder aujourd'hui" -Style 'PrimaryButton' -Margin '0,0,6,4' -Tag "keep|$($task.id)" -OnClick { $p = ([string]$this.Tag).Split('|'); Resolve-TdReviewNow -Id $p[1] -Decision $p[0] }
+        $keep.Padding = New-Object System.Windows.Thickness 14, 6, 14, 6
+        [void]$actions.Children.Add($keep)
+        $later = New-TdButton -Content 'Demain' -Style 'PillButton' -Margin '0,0,6,4' -Tag "tomorrow|$($task.id)" -OnClick { $p = ([string]$this.Tag).Split('|'); Resolve-TdReviewNow -Id $p[1] -Decision $p[0] }
+        $later.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
+        [void]$actions.Children.Add($later)
+        [void]$actions.Children.Add((New-TdButton -Content 'Abandonner' -Style 'GhostButton' -Margin '0,0,0,4' -Tag "drop|$($task.id)" -OnClick { $p = ([string]$this.Tag).Split('|'); Resolve-TdReviewNow -Id $p[1] -Decision $p[0] }))
+        [void]$stack.Children.Add($actions)
+        $card.Child = $stack
+        [void]$Panel.Children.Add($card)
+    }
+    $all = New-TdButton -Content "Tout garder pour aujourd'hui" -Style 'PrimaryButton' -Margin '0,6,0,0' -OnClick {
+        Clear-TdReview (Get-TdState)
+        Save-TdStateNow
+        Close-TdDrawer
+        Show-TdToast -Text 'Revue terminée. Belle journée !' -Seconds 4
+    }
+    $all.HorizontalAlignment = 'Left'
+    [void]$Panel.Children.Add($all)
+    [void]$Panel.Children.Add((New-TdText -Text 'Fermer ce panneau garde le reste pour aujourd''hui.' -Size 12 -Brush 'MutedBrush' -Wrap -Margin '2,10,0,0'))
+}
+
 # ---------------------------------------------------------------- sons
 
 function Build-TdSoundsPanel {
@@ -137,12 +191,16 @@ function Build-TdSoundsPanel {
         $chip = New-TdChip -Content $label -Group 'chime' -Checked ([int]$settings.chimeEveryMin -eq $m) -Tag $m -OnClick {
             $s = Get-TdSettings
             $s.chimeEveryMin = [int]$this.Tag
-            $script:Td.ChimeTaskId = ''
+            $script:Td.Signals.ChimeTaskId = ''
             Save-TdSettingsNow
         }
         [void]$wrap.Children.Add($chip)
     }
     [void]$Panel.Children.Add($wrap)
+    [void]$Panel.Children.Add((New-TdSwitch -Label 'Point de contrôle à chaque carillon : « Toujours sur ta tâche ? »' -Checked $settings.checkInWithChime -OnChange {
+                (Get-TdSettings).checkInWithChime = [bool]$this.IsChecked
+                Save-TdSettingsNow
+            }))
     $row = New-TdPanel -Orientation Horizontal
     [void]$row.Children.Add((New-TdButton -Content 'Écouter' -Style 'PillButton' -Margin '0,0,8,0' -OnClick { Invoke-TdSoundEffect -Name 'chime' -Volume (Get-TdSettings).chimeVolume }))
     [void]$Panel.Children.Add($row)
@@ -162,7 +220,8 @@ function Build-TdSoundsPanel {
             }))
     $row = New-TdPanel -Orientation Horizontal -Margin '0,4,0,0'
     [void]$row.Children.Add((New-TdButton -Content 'Écouter la validation' -Margin '0,0,8,0' -OnClick { Invoke-TdSoundEffect -Name 'complete' -Volume (Get-TdSettings).effectsVolume }))
-    [void]$row.Children.Add((New-TdButton -Content 'Écouter la fin de temps' -OnClick { Invoke-TdSoundEffect -Name 'timeup' -Volume (Get-TdSettings).effectsVolume }))
+    [void]$row.Children.Add((New-TdButton -Content 'Écouter la fin de temps' -Margin '0,0,8,0' -OnClick { Invoke-TdSoundEffect -Name 'timeup' -Volume (Get-TdSettings).effectsVolume }))
+    [void]$row.Children.Add((New-TdButton -Content 'Atterrissage' -OnClick { Invoke-TdSoundEffect -Name 'landing' -Volume (Get-TdSettings).effectsVolume }))
     [void]$Panel.Children.Add($row)
     [void]$Panel.Children.Add((New-TdLabeledRow 'Volume' (New-TdSlider -Value $settings.effectsVolume -ToolTip 'Volume des effets' -OnChange {
                     (Get-TdSettings).effectsVolume = [Math]::Round($this.Value, 2)
@@ -368,6 +427,19 @@ function Build-TdStatsPanel {
         [void]$tiles.Children.Add($card)
     }
     [void]$Panel.Children.Add($tiles)
+
+    $checks = Get-TdCheckInSummary -CheckIns $script:Td.Data.checkins -NowMs (Get-TdNowMs)
+    Add-TdSection $Panel 'Points de contrôle'
+    if ($checks.total -gt 0) {
+        $line = "Aujourd'hui : {0} point(s) de contrôle · {1} fois concentré·e · {2} recentrage(s)." -f $checks.total, $checks.focused, $checks.drifted
+        [void]$Panel.Children.Add((New-TdText -Text $line -Size 13 -Wrap -Margin '2,0,0,4'))
+        if ($checks.drifted -gt 0) {
+            [void]$Panel.Children.Add((New-TdText -Text 'Chaque recentrage compte : remarquer qu''on s''est égaré·e, c''est déjà revenir.' -Size 12 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,0'))
+        }
+    }
+    else {
+        [void]$Panel.Children.Add((New-TdText -Text 'Active le carillon périodique (panneau Sons) pour recevoir un point de contrôle « Toujours sur ta tâche ? ».' -Size 12 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,0'))
+    }
 
     Add-TdSection $Panel '7 derniers jours' 'Minutes estimées et minutes réellement passées, par jour.'
     # Légende (toujours présente avec deux séries) : l'identité ne repose pas que sur la couleur.
@@ -703,6 +775,18 @@ function Build-TdSettingsPanel {
     }
     [void]$Panel.Children.Add($wrap)
     [void]$Panel.Children.Add((New-TdText -Text 'Le compte progressif affiche le temps écoulé : utile si le compte à rebours crée de l''anxiété.' -Size 12 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,6'))
+    [void]$Panel.Children.Add((New-TdText -Text 'Signal d''atterrissage avant la fin prévue' -Size 13 -Brush 'MutedBrush' -Margin '2,8,0,6'))
+    $wrap = New-TdPanel -Wrap
+    foreach ($m in @(0, 1, 2, 5)) {
+        $label = "$m min avant"
+        if ($m -eq 0) { $label = 'Désactivé' }
+        [void]$wrap.Children.Add((New-TdChip -Content $label -Group 'landing' -Checked ([int]$settings.landingMinutes -eq $m) -Tag $m -OnClick {
+                    (Get-TdSettings).landingMinutes = [int]$this.Tag
+                    $script:Td.Signals.LandingKey = ''
+                    Save-TdSettingsNow
+                }))
+    }
+    [void]$Panel.Children.Add($wrap)
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Enchaîner automatiquement la tâche suivante après validation' -Checked $settings.autoStartNext -OnChange {
                 (Get-TdSettings).autoStartNext = [bool]$this.IsChecked
                 Save-TdSettingsNow
@@ -722,6 +806,12 @@ function Build-TdSettingsPanel {
                 }))
     }
     [void]$Panel.Children.Add($wrap)
+
+    Add-TdSection $Panel 'Journée'
+    [void]$Panel.Children.Add((New-TdSwitch -Label 'Revue du matin : trier les tâches restées d''hier (garder, demain, abandonner)' -Checked $settings.morningReview -OnChange {
+                (Get-TdSettings).morningReview = [bool]$this.IsChecked
+                Save-TdSettingsNow
+            }))
 
     Add-TdSection $Panel 'Démarrage de Windows' 'Sans droits administrateur : TDfocus s''inscrit seulement dans ta session (clé HKCU\…\Run).'
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Lancer TDfocus à l''ouverture de session' -Checked $settings.autostart -OnChange {
@@ -780,6 +870,7 @@ function Build-TdSettingsPanel {
     Add-TdSection $Panel 'Raccourcis clavier'
     foreach ($line in @(
             'Espace : démarrer / pause',
+            'S : étape faite',
             'Ctrl + Entrée : valider la tâche en cours',
             '+ / − : ajouter / retirer 1 minute',
             'L : reporter la tâche en fin de liste',

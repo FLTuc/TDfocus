@@ -30,9 +30,8 @@ function Initialize-TdApp {
         HintMinutes       = $null
         RowRefs           = @{}
         StructureKey      = ''
-        TimeUpKey         = ''
-        ChimeTaskId       = ''
-        ChimeIndex        = -1
+        Signals           = New-TdSignalMemory
+        CheckIn           = $null
         LastHeartbeat     = 0
         LastThemeCheck    = 0
         LastMinuteKey     = ''
@@ -73,14 +72,15 @@ function Initialize-TdApp {
     [void](Invoke-TdDayRollover -State $state -NowMs $now)
     Sync-TdState $state $now
     $script:Td.Data.history = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdHistory -History $script:Td.Data.history -NowMs $now))
-    $current = Get-TdCurrentTask $state
-    if ($current -and (Get-TdRemainingMs $current $now) -le 0) { $script:Td.TimeUpKey = "$($current.id)|$($current.plannedMs)" }
+    $script:Td.Data.checkins = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdCheckIns -CheckIns $script:Td.Data.checkins -NowMs $now))
+    Initialize-TdSignalMemory -State $state -Settings $script:Td.Data.settings -NowMs $now -Memory $script:Td.Signals
     Save-TdStateNow
 
     Register-TdMainEvents
     Update-TdThemeNow
     Build-TdAddBarChips
     Update-TdView
+    Show-TdMorningReviewIfNeeded
     if ($null -ne $paused) {
         Show-TdToast -Text ("Minuteur mis en pause à {0}, quand TDfocus s'est fermé." -f (Format-TdClock $paused)) -Seconds 8
     }
@@ -342,6 +342,175 @@ function Limit-TdText {
     $Text.Substring(0, $Max - 1) + [char]0x2026
 }
 
+# ---------------------------------------------------------------- sous-étapes
+
+function Update-TdStepPanel {
+    param([Parameter(Mandatory)]$Task)
+    $ui = $script:Td.Ui
+    $progress = Get-TdStepProgress $Task
+    if ($progress.total -eq 0) { $ui.StepPanel.Visibility = 'Collapsed'; return }
+    $ui.StepPanel.Visibility = 'Visible'
+    if ($progress.current) {
+        $ui.StepCounter.Text = 'ÉTAPE {0} / {1}' -f $progress.index, $progress.total
+        $ui.StepTitle.Text = $progress.current.title
+        $ui.BtnStepDone.Visibility = 'Visible'
+    }
+    else {
+        $ui.StepCounter.Text = 'ÉTAPES TERMINÉES · {0} / {0}' -f $progress.total
+        $ui.StepTitle.Text = 'Tout est fait : tu peux valider la tâche.'
+        $ui.BtnStepDone.Visibility = 'Collapsed'
+    }
+    if ($progress.done -gt 0) { $ui.BtnStepUndo.Visibility = 'Visible' } else { $ui.BtnStepUndo.Visibility = 'Collapsed' }
+    if ($progress.total -le 12) {
+        $ui.StepDots.Text = ([string][char]0x25CF * $progress.done) + ([string][char]0x25CB * ($progress.total - $progress.done))
+        $ui.StepDots.Visibility = 'Visible'
+    }
+    else { $ui.StepDots.Visibility = 'Collapsed' }
+}
+
+function Complete-TdStepNow {
+    $state = Get-TdState
+    $current = Get-TdCurrentTask $state
+    if (-not $current) { return }
+    $step = Complete-TdStep -State $state
+    if (-not $step) { return }
+    $settings = Get-TdSettings
+    if ($settings.completionSound) { Invoke-TdSoundEffect -Name 'complete' -Volume ($settings.effectsVolume * 0.5) }
+    Save-TdStateNow
+    Update-TdView
+    if (Get-TdCurrentStep $current) {
+        Show-TdToast -Text ('Étape faite : « {0} ».' -f (Limit-TdText $step.title 40)) -ActionText 'Annuler' -Seconds 4 -Action { Undo-TdStepNow }
+    }
+    else {
+        Show-TdToast -Text 'Dernière étape faite ! Tu peux valider la tâche.' -ActionText 'Valider' -Action { Complete-TdCurrentNow }
+    }
+}
+
+function Undo-TdStepNow {
+    if (Undo-TdStep -State (Get-TdState)) {
+        Save-TdStateNow
+        Update-TdView
+    }
+}
+
+# ---------------------------------------------------------------- signaux et points de contrôle
+
+function Invoke-TdSignal {
+    param([Parameter(Mandatory)][string]$Signal)
+    $settings = Get-TdSettings
+    $current = Get-TdCurrentTask (Get-TdState)
+    if (-not $current) { return }
+    $hidden = -not $script:Td.Window.IsActive
+    $title = Limit-TdText $current.title 60
+    switch ($Signal) {
+        'timeup' {
+            # Fin du temps prévu : signal doux, une seule fois, jamais bloquant.
+            if ($settings.timeUpSignal) { Invoke-TdSoundEffect -Name 'timeup' -Volume $settings.effectsVolume }
+            if ($settings.notifications -and $hidden) {
+                Show-TdTrayBalloon -Text ("Le temps prévu pour « {0} » est écoulé. Continue tranquillement ou valide quand c'est bon." -f $title)
+            }
+        }
+        'landing' {
+            Invoke-TdSoundEffect -Name 'landing' -Volume $settings.effectsVolume
+            if ($settings.notifications -and $hidden) {
+                Show-TdTrayBalloon -Text ("Atterrissage : plus que {0} min sur « {1} ». Note où tu t'arrêtes." -f $settings.landingMinutes, $title)
+            }
+        }
+        'chime' {
+            Invoke-TdSoundEffect -Name 'chime' -Volume $settings.chimeVolume
+            if ($settings.checkInWithChime) { Start-TdCheckIn }
+        }
+    }
+}
+
+function Start-TdCheckIn {
+    $current = Get-TdCurrentTask (Get-TdState)
+    if (-not $current) { return }
+    if ($script:Td.CheckIn) { Complete-TdCheckIn -Answer 'missed' }
+    $script:Td.CheckIn = @{ TaskId = $current.id; Until = (Get-TdNowMs) + 90000 }
+    $settings = Get-TdSettings
+    if ($settings.notifications -and -not $script:Td.Window.IsActive) {
+        Show-TdTrayBalloon -Text ('Toujours sur « {0} » ? Clique sur TDfocus pour répondre.' -f (Limit-TdText $current.title 50))
+    }
+    Update-TdCheckInView
+}
+
+function Complete-TdCheckIn {
+    param([Parameter(Mandatory)][ValidateSet('focused', 'drifted', 'missed')][string]$Answer)
+    $checkIn = $script:Td.CheckIn
+    if (-not $checkIn) { return }
+    $script:Td.CheckIn = $null
+    $script:Td.Data.checkins.Add((New-TdCheckIn -TaskId $checkIn.TaskId -Answer $Answer))
+    try { Save-TdCheckIns $script:Td.Data.checkins } catch { Write-TdLog "Points de contrôle non enregistrés : $($_.Exception.Message)" }
+    Update-TdCheckInView
+    $current = Get-TdCurrentTask (Get-TdState)
+    switch ($Answer) {
+        'focused' { Show-TdToast -Text 'Bien joué, continue comme ça.' -Seconds 3 }
+        'drifted' {
+            $target = ''
+            if ($current) {
+                $target = $current.title
+                $step = Get-TdCurrentStep $current
+                if ($step) { $target = $step.title }
+            }
+            Show-TdToast -Text ("Pas grave, c'est fait pour ça. On reprend : « {0} »." -f (Limit-TdText $target 40)) -ActionText 'Noter la distraction' -Seconds 8 -Action { Show-TdDrawer 'notes' -Force }
+        }
+    }
+    if ($script:Td.Drawer -eq 'stats') { Update-TdDrawer }
+}
+
+function Update-TdCheckInView {
+    $ui = $script:Td.Ui
+    $checkIn = $script:Td.CheckIn
+    $current = Get-TdCurrentTask (Get-TdState)
+    if ($checkIn -and $current) {
+        $ui.CheckInText.Text = 'Toujours sur « {0} » ?' -f (Limit-TdText $current.title 40)
+        $ui.CheckInBar.Visibility = 'Visible'
+        foreach ($name in @('CompactCheckYes', 'CompactCheckDrift')) { $ui[$name].Visibility = 'Visible' }
+        foreach ($name in @('CompactStartPause', 'CompactDone')) { $ui[$name].Visibility = 'Collapsed' }
+    }
+    else {
+        $ui.CheckInBar.Visibility = 'Collapsed'
+        foreach ($name in @('CompactCheckYes', 'CompactCheckDrift')) { $ui[$name].Visibility = 'Collapsed' }
+        foreach ($name in @('CompactStartPause', 'CompactDone')) { $ui[$name].Visibility = 'Visible' }
+    }
+}
+
+# ---------------------------------------------------------------- revue du matin
+
+function Show-TdMorningReviewIfNeeded {
+    $state = Get-TdState
+    if (-not (Get-TdSettings).morningReview) {
+        if ($state.review.Count -gt 0) { Clear-TdReview $state; Save-TdStateNow }
+        return
+    }
+    if (@(Get-TdReviewTasks $state).Count -gt 0) { Show-TdDrawer 'review' -Force }
+}
+
+function Resolve-TdReviewNow {
+    param([Parameter(Mandatory)][string]$Id, [Parameter(Mandatory)][string]$Decision)
+    $state = Get-TdState
+    $task = Resolve-TdReview -State $state -Id $Id -Decision $Decision -NowMs (Get-TdNowMs)
+    if (-not $task) { Update-TdDrawer; return }
+    Complete-TdChange -Replan
+    $name = Limit-TdText $task.title 40
+    switch ($Decision) {
+        'tomorrow' { Show-TdToast -Text ('« {0} » reportée à demain.' -f $name) -Seconds 4 }
+        'drop' {
+            Show-TdToast -Text ('« {0} » abandonnée. C''est un choix valable.' -f $name) -ActionText 'Annuler' -Data @{ Task = $task } -Action {
+                param($d)
+                (Get-TdState).tasks.Add($d.Task)
+                Complete-TdChange -Replan
+            }
+        }
+    }
+    if (@(Get-TdReviewTasks $state).Count -eq 0) {
+        Close-TdDrawer
+        if ($Decision -eq 'keep') { Show-TdToast -Text 'Revue terminée. Belle journée !' -Seconds 4 }
+    }
+    else { Update-TdDrawer }
+}
+
 # ---------------------------------------------------------------- modes d'affichage
 
 function Set-TdFocusMode {
@@ -446,9 +615,11 @@ function Get-TdStructureKey {
     # Ce qui impose de reconstruire la liste (et pas seulement de mettre à jour les heures).
     param($Schedule)
     $state = Get-TdState
-    $parts = foreach ($t in $state.tasks) { '{0}:{1}:{2}:{3}:{4}' -f $t.id, $t.title, $t.plannedMs, $t.categoryId, $t.fixedStart }
+    $parts = foreach ($t in $state.tasks) {
+        '{0}:{1}:{2}:{3}:{4}:{5}' -f $t.id, $t.title, $t.plannedMs, $t.categoryId, $t.fixedStart, (@($t.steps | Where-Object { $_.done }).Count)
+    }
     $flags = foreach ($it in $Schedule.items) { '{0}{1}' -f [int]($it.gapMs -ge 60000), [int]($it.lateMs -gt 0) }
-    ($parts -join '|') + '#' + ($flags -join '') + '#' + $script:Td.EditingId + '#' + $state.done.Count
+    ($parts -join '|') + '#' + ($flags -join '') + '#' + $script:Td.EditingId + '#' + $state.done.Count + '#' + $state.parked.Count
 }
 
 function Update-TdFocusCard {
@@ -497,9 +668,18 @@ function Update-TdFocusCard {
     $elapsed = Get-TdElapsedMs $current $NowMs
     $remaining = [long]$current.plannedMs - $elapsed
     $overtime = $remaining -lt 0
+    $pausedMs = Get-TdPausedMs $current $NowMs
+    $stateBrush = 'MutedBrush'
     if ($running) { $ui.CurrentState.Text = 'En cours' }
+    elseif ($null -ne $pausedMs) {
+        # Compteur de pause visible : la pause ne s'étire pas sans qu'on s'en rende compte.
+        $ui.CurrentState.Text = 'En pause ' + (Format-TdPausedFor $pausedMs)
+        $stateBrush = 'AccentBrush'
+    }
     elseif ($elapsed -gt 0) { $ui.CurrentState.Text = 'En pause' }
     else { $ui.CurrentState.Text = 'Pas encore commencée' }
+    $ui.CurrentState.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, $stateBrush)
+    Update-TdStepPanel -Task $current
 
     $planned = [double][Math]::Max(1, $current.plannedMs)
     if ($settings.timerMode -eq 'countup') {
@@ -545,6 +725,15 @@ function Update-TdFocusCard {
     }
     else {
         $ui.OvertimeHint.Visibility = 'Collapsed'
+    }
+    # Atterrissage : quelques minutes avant la fin, préparer la transition.
+    $window = [long]$settings.landingMinutes * 60000
+    if ($running -and $window -gt 0 -and $remaining -gt 0 -and $remaining -le $window -and [long]$current.plannedMs -gt $window + 60000) {
+        $ui.LandingHint.Text = "Atterrissage : encore $(Format-TdCountdown $remaining). Termine ta phrase et note où tu t'arrêtes."
+        $ui.LandingHint.Visibility = 'Visible'
+    }
+    else {
+        $ui.LandingHint.Visibility = 'Collapsed'
     }
     if ($script:Td.FocusMode -and $state.tasks.Count -gt 1) {
         $next = $state.tasks[1]
@@ -629,8 +818,12 @@ function Update-TdHeader {
             $tip = '{0} · {1}' -f $clock, $current.title
         }
         else {
-            $title = '{0} (en pause) — TDfocus' -f $current.title
-            $tip = 'En pause · {0}' -f $current.title
+            $pause = 'en pause'
+            $pausedMs = Get-TdPausedMs $current $NowMs
+            if ($null -ne $pausedMs) { $pause = 'en pause ' + (Format-TdPausedFor $pausedMs) }
+            $title = '{0} ({1}) — TDfocus' -f $current.title, $pause
+            $label = $pause.Substring(0, 1).ToUpperInvariant() + $pause.Substring(1)
+            $tip = '{0} · {1}' -f $label, $current.title
         }
     }
     if ($script:Td.Window.Title -ne $title) { $script:Td.Window.Title = $title }
@@ -673,7 +866,10 @@ function Update-TdCompact {
     if ($remaining -lt 0) { $key = 'OvertimeBrush' } else { $key = 'AccentBrush' }
     $ui.CompactArc.SetResourceReference([System.Windows.Shapes.Shape]::StrokeProperty, $key)
     $ui.CompactArc.Data = Get-TdArcGeometry -Size 54 -Thickness 5 -Fraction $fraction
-    $ui.CompactMeta.Text = 'fin {0} · liste {1}' -f (Format-TdClock $Schedule.items[0].endMs), (Format-TdClock $Schedule.endMs)
+    $pausedMs = Get-TdPausedMs $current $NowMs
+    if ($script:Td.CheckIn) { $ui.CompactMeta.Text = 'Toujours dessus ?' }
+    elseif ($null -ne $pausedMs) { $ui.CompactMeta.Text = 'pause ' + (Format-TdPausedFor $pausedMs) }
+    else { $ui.CompactMeta.Text = 'fin {0} · liste {1}' -f (Format-TdClock $Schedule.items[0].endMs), (Format-TdClock $Schedule.endMs) }
     if ($null -ne $current.runningSince) { $ui.CompactStartPause.Content = [string][char]0xE769 } else { $ui.CompactStartPause.Content = [string][char]0xE768 }
 }
 
@@ -774,34 +970,18 @@ function Invoke-TdTick {
         [void](Invoke-TdDayRollover -State $state -NowMs $now)
         Save-TdStateNow
         Update-TdView
+        Show-TdMorningReviewIfNeeded
     }
 
-    $current = Get-TdCurrentTask $state
-    if ($current -and $null -ne $current.runningSince) {
-        $elapsed = Get-TdElapsedMs $current $now
-        $remaining = [long]$current.plannedMs - $elapsed
-        # Fin du temps prévu : signal doux, une seule fois, jamais bloquant.
-        $key = "$($current.id)|$($current.plannedMs)"
-        if ($remaining -le 0 -and $script:Td.TimeUpKey -ne $key) {
-            $script:Td.TimeUpKey = $key
-            if ($settings.timeUpSignal) { Invoke-TdSoundEffect -Name 'timeup' -Volume $settings.effectsVolume }
-            if ($settings.notifications -and -not $script:Td.Window.IsActive) {
-                Show-TdTrayBalloon -Text ("Le temps prévu pour « {0} » est écoulé. Continue tranquillement ou valide quand c'est bon." -f (Limit-TdText $current.title 60))
-            }
-        }
-        # Carillon périodique pour sortir de la rêverie.
-        $every = [int]$settings.chimeEveryMin
-        if ($every -gt 0) {
-            $index = [long][Math]::Floor($elapsed / ($every * 60000.0))
-            if ($script:Td.ChimeTaskId -ne $current.id) {
-                $script:Td.ChimeTaskId = $current.id
-                $script:Td.ChimeIndex = $index
-            }
-            elseif ($index -gt $script:Td.ChimeIndex) {
-                $script:Td.ChimeIndex = $index
-                Invoke-TdSoundEffect -Name 'chime' -Volume $settings.chimeVolume
-            }
-        }
+    # Signaux doux : atterrissage, fin du temps prévu, carillon (+ point de contrôle).
+    foreach ($signal in @(Get-TdSignals -State $state -Settings $settings -NowMs $now -Memory $script:Td.Signals)) {
+        Invoke-TdSignal -Signal $signal
+    }
+    # Un point de contrôle sans réponse s'efface tout seul (ou si la tâche a changé).
+    $checkIn = $script:Td.CheckIn
+    if ($checkIn) {
+        $current = Get-TdCurrentTask $state
+        if ($now -ge $checkIn.Until -or -not $current -or $current.id -ne $checkIn.TaskId) { Complete-TdCheckIn -Answer 'missed' }
     }
 
     $schedule = Get-TdSchedule -State $state -NowMs $now
@@ -894,6 +1074,16 @@ function Register-TdMainEvents {
     $ui.BtnMinus5.Add_Click({ Add-TdTimeNow -5 })
     $ui.BtnLater.Add_Click({ Move-TdCurrentLater })
     $ui.BtnTimerMode.Add_Click({ Switch-TdTimerMode })
+    $ui.BtnStepDone.Add_Click({ Complete-TdStepNow })
+    $ui.BtnStepUndo.Add_Click({ Undo-TdStepNow })
+    $ui.BtnCheckInYes.Add_Click({ Complete-TdCheckIn -Answer 'focused' })
+    $ui.BtnCheckInDrift.Add_Click({ Complete-TdCheckIn -Answer 'drifted' })
+    $ui.CompactCheckYes.Add_Click({ Complete-TdCheckIn -Answer 'focused' })
+    $ui.CompactCheckDrift.Add_Click({ Complete-TdCheckIn -Answer 'drifted' })
+    $ui.BtnParkedRestore.Add_Click({
+            [void](Restore-TdParked -State (Get-TdState) -All)
+            Complete-TdChange -Replan
+        })
     $ui.BtnTaskNote.Add_Click({
             $script:Td.NoteOpen = -not $script:Td.NoteOpen
             Update-TdView
@@ -1078,6 +1268,7 @@ function Invoke-TdShortcut {
         'F' { Set-TdFocusMode (-not $script:Td.FocusMode); $e.Handled = $true }
         'M' { Set-TdCompactMode (-not $script:Td.Compact); $e.Handled = $true }
         'L' { Move-TdCurrentLater; $e.Handled = $true }
+        'S' { Complete-TdStepNow; $e.Handled = $true }
         'N' { Show-TdAddBox; $e.Handled = $true }
     }
 }

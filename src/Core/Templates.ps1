@@ -12,8 +12,8 @@ function Get-TdDefaultCategories {
 }
 
 function New-TdTemplateItem {
-    param([string]$Title, [double]$Minutes, [string]$CategoryId)
-    [pscustomobject][ordered]@{ title = $Title; minutes = $Minutes; categoryId = $CategoryId }
+    param([string]$Title, [double]$Minutes, [string]$CategoryId, [string[]]$Steps = @())
+    [pscustomobject][ordered]@{ title = $Title; minutes = $Minutes; categoryId = $CategoryId; steps = @($Steps) }
 }
 
 function Get-TdBuiltInTemplates {
@@ -27,7 +27,7 @@ function Get-TdBuiltInTemplates {
                 New-TdTemplateItem "Boire un grand verre d'eau" 2 'sante'
                 New-TdTemplateItem 'Douche et habillage' 15 'maison'
                 New-TdTemplateItem 'Petit-déjeuner' 15 'maison'
-                New-TdTemplateItem 'Préparer mes affaires' 5 'maison'
+                New-TdTemplateItem 'Préparer mes affaires' 5 'maison' @('Clés', 'Téléphone et chargeur', 'Portefeuille', 'Sac du jour')
                 New-TdTemplateItem 'Relire la liste du jour' 5 'travail'
             )
         }
@@ -37,7 +37,7 @@ function Get-TdBuiltInTemplates {
             emoji   = [char]::ConvertFromUtf32(0x1F3AF)
             builtIn = $true
             items   = @(
-                New-TdTemplateItem 'Préparer l''espace (téléphone loin)' 5 'travail'
+                New-TdTemplateItem 'Préparer l''espace' 5 'travail' @('Téléphone dans une autre pièce', 'Fermer les onglets inutiles', 'Verre d''eau à portée de main', 'Noter le but du bloc')
                 New-TdTemplateItem 'Bloc de concentration 1' 45 'travail'
                 New-TdTemplateItem 'Pause mouvement' 10 'pause'
                 New-TdTemplateItem 'Bloc de concentration 2' 45 'travail'
@@ -53,7 +53,7 @@ function Get-TdBuiltInTemplates {
             items   = @(
                 New-TdTemplateItem 'Vider la boîte de réception' 15 'travail'
                 New-TdTemplateItem 'Noter où je me suis arrêté·e' 5 'travail'
-                New-TdTemplateItem 'Choisir les 3 priorités de demain' 10 'travail'
+                New-TdTemplateItem 'Choisir les 3 priorités de demain' 10 'travail' @('Relire ce qui reste', 'Choisir 3 priorités', 'Les écrire dans TDfocus')
                 New-TdTemplateItem 'Ranger le bureau' 5 'maison'
                 New-TdTemplateItem 'Déconnexion douce' 10 'pause'
             )
@@ -69,7 +69,8 @@ function ConvertTo-TdTemplate {
         if ([string]::IsNullOrWhiteSpace($title)) { continue }
         $minutes = Get-TdValue $item 'minutes'
         if ($null -eq $minutes -or [double]$minutes -lt 1) { $minutes = 25 }
-        New-TdTemplateItem $title ([double]$minutes) (ConvertTo-TdNullableString (Get-TdValue $item 'categoryId'))
+        $steps = @(Get-TdValue $item 'steps' | Where-Object { $_ } | ForEach-Object { if ($_ -is [string]) { $_ } else { [string](Get-TdValue $_ 'title') } })
+        New-TdTemplateItem $title ([double]$minutes) (ConvertTo-TdNullableString (Get-TdValue $item 'categoryId')) $steps
     }
     $id = ConvertTo-TdNullableString (Get-TdValue $InputObject 'id')
     if (-not $id) { $id = New-TdId }
@@ -88,7 +89,7 @@ function New-TdTemplateFromTasks {
     # Enregistre la liste actuelle comme routine réutilisable.
     param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][AllowEmptyCollection()]$Tasks)
     $items = foreach ($t in $Tasks) {
-        New-TdTemplateItem $t.title ([Math]::Round([long]$t.plannedMs / 60000)) $t.categoryId
+        New-TdTemplateItem $t.title ([Math]::Round([long]$t.plannedMs / 60000)) $t.categoryId @(@($t.steps) | Where-Object { $_ } | ForEach-Object { $_.title })
     }
     ConvertTo-TdTemplate @{ name = $Name.Trim(); items = @($items) }
 }
@@ -96,7 +97,7 @@ function New-TdTemplateFromTasks {
 function ConvertTo-TdTasksFromTemplate {
     param([Parameter(Mandatory)]$Template, [long]$NowMs = (Get-TdNowMs))
     $tasks = foreach ($item in $Template.items) {
-        New-TdTask -Title $item.title -Minutes ([double]$item.minutes) -CategoryId $item.categoryId -Source 'template' -NowMs $NowMs
+        New-TdTask -Title $item.title -Minutes ([double]$item.minutes) -CategoryId $item.categoryId -Steps @($item.steps) -Source 'template' -NowMs $NowMs
     }
     , @($tasks)
 }
