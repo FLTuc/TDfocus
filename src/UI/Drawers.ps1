@@ -349,7 +349,7 @@ function Build-TdStatsPanel {
     $colors = $script:TdChartColors[$mode]
 
     # Aujourd'hui (chiffres clés)
-    $tiles = New-Object System.Windows.Controls.UniformGrid
+    $tiles = New-Object System.Windows.Controls.Primitives.UniformGrid
     $tiles.Columns = 2
     $tiles.Margin = New-Object System.Windows.Thickness 0, 12, 0, 0
     foreach ($tile in @(
