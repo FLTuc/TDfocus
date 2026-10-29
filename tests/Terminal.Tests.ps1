@@ -24,7 +24,7 @@ BeforeAll {
         if ($Name -eq 'CtrlC') { return [System.ConsoleKeyInfo]::new([char]3, [ConsoleKey]::C, $false, $false, $true) }
         if ($special.ContainsKey($Name)) { return [System.ConsoleKeyInfo]::new($special[$Name][0], $special[$Name][1], $false, $false, $false) }
         $ch = [char]$Name
-        $key = [ConsoleKey]0
+        $key = [ConsoleKey]::NoName   # ponctuation : code de touche neutre (PowerShell 5.1 refuse 0)
         if ([char]::IsLetterOrDigit($ch) -and [int]$ch -lt 128) { $key = [ConsoleKey][int][char]::ToUpperInvariant($ch) }
         [System.ConsoleKeyInfo]::new($ch, $key, [char]::IsUpper($ch), $false, $false)
     }
@@ -295,6 +295,16 @@ Describe 'Minuteur : signaux, points de contrôle, revue du matin' {
         $tui.CheckIn | Should -BeNullOrEmpty
         $tui.Data.checkins.Count | Should -Be 1
         $tui.Data.checkins[0].answer | Should -Be 'focused'
+    }
+    It 'garde les deux réponses visibles, même avec un long titre' {
+        $tui.Data.state.tasks[0].title = 'Rédiger le rapport trimestriel pour le comité de direction'
+        Invoke-TdTuiTick -NowMs ($now + 5 * $Min + 1000)
+        foreach ($width in @(100, 60, 40)) {
+            $line = Remove-TdAnsi (Get-TdTuiStatusLine -NowMs $now -Width $width)
+            Get-TdTextWidth $line | Should -BeLessOrEqual $width
+            $line | Should -Match '\[o\] oui'
+            $line | Should -Match '\[g\] (je me suis )?égaré·e'
+        }
     }
     It 'propose de noter la distraction après « je me suis égaré·e »' {
         Invoke-TdTuiTick -NowMs ($now + 5 * $Min + 1000)

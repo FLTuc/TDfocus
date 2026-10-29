@@ -240,8 +240,16 @@ function Get-TdTuiStatusLine {
         $current = Get-TdCurrentTask $state
         $title = ''
         if ($current) { $title = $current.title }
-        $question = 'Toujours sur « {0} » ?' -f (Limit-TdTuiText -Text $title -Width ([Math]::Max(10, $Width - 52)))
-        return '  ' + (Format-TdTui -Text $question -Color 'success' -Bold) + '   ' + (Format-TdTui -Text '[o] oui, je suis dessus   [g] je me suis égaré·e' -Color 'title')
+        # Le titre se raccourcit, puis les réponses, pour que les deux touches restent visibles.
+        $answers = '[o] oui, je suis dessus   [g] je me suis égaré·e'
+        $room = $Width - 23 - (Get-TdTextWidth $answers)
+        if ($room -lt (Get-TdTextWidth $title)) {
+            $answers = '[o] oui   [g] égaré·e'
+            $room = $Width - 23 - (Get-TdTextWidth $answers)
+        }
+        $question = 'Toujours sur « {0} » ?' -f (Limit-TdTuiText -Text $title -Width $room)
+        if ($room -lt 6) { $question = 'Toujours dessus ?'; $answers = '[o] oui [g] égaré·e' }
+        return '  ' + (Format-TdTui -Text $question -Color 'success' -Bold) + '  ' + (Format-TdTui -Text $answers -Color 'title')
     }
     if ($tui.Message -and $NowMs -lt $tui.Message.Until) {
         $color = 'title'
