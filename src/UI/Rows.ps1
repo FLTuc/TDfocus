@@ -261,7 +261,7 @@ function New-TdRowContextMenu {
                 $parts = ([string]$this.Tag).Split('|')
                 Invoke-TdRowCommand -Command $parts[0] -Id $parts[1]
             })
-        [void]$menu.Items.Add($mi)
+        [void]$menu.Items.Add([System.Windows.Controls.MenuItem]$mi)
     }
     $menu
 }
@@ -305,7 +305,7 @@ function Show-TdDurationMenu {
                 [void](Update-TdTask -State (Get-TdState) -Id $parts[1] -Changes @{ minutes = [double]$parts[0] })
                 Complete-TdChange -Replan
             })
-        [void]$menu.Items.Add($mi)
+        [void]$menu.Items.Add([System.Windows.Controls.MenuItem]$mi)
     }
     $menu.PlacementTarget = $Button
     $menu.Placement = [System.Windows.Controls.Primitives.PlacementMode]::Bottom
@@ -332,8 +332,8 @@ function Register-TdRowDrag {
             $script:Td.PendingDrop = $null
             $s.Opacity = 0.45
             try {
-                $data = New-Object System.Windows.DataObject ('TDfocusTask', [string]$s.Tag)
-                [void][System.Windows.DragDrop]::DoDragDrop($s, $data, [System.Windows.DragDropEffects]::Move)
+                $data = [System.Windows.DataObject](New-Object System.Windows.DataObject ('TDfocusTask', [string]$s.Tag))
+                [void][System.Windows.DragDrop]::DoDragDrop([System.Windows.DependencyObject]$s, [System.Windows.DataObject]$data, [System.Windows.DragDropEffects]::Move)
             }
             finally {
                 $s.Opacity = 1

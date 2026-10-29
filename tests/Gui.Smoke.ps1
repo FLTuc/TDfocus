@@ -59,6 +59,19 @@ function Save-TdScreenshot {
     $stream = [System.IO.File]::Create($path)
     try { $encoder.Save($stream) } finally { $stream.Dispose() }
     Write-Host "  capture $path"
+    # Aperçu réduit dans le journal (base64) pour les captures listées dans TDFOCUS_SMOKE_PREVIEW.
+    if ($env:TDFOCUS_SMOKE_PREVIEW -and ($env:TDFOCUS_SMOKE_PREVIEW.Split(',') -contains $Name)) {
+        $scaled = New-Object System.Windows.Media.Imaging.TransformedBitmap $bitmap, (New-Object System.Windows.Media.ScaleTransform 0.6, 0.6)
+        $jpeg = New-Object System.Windows.Media.Imaging.JpegBitmapEncoder
+        $jpeg.QualityLevel = 72
+        $jpeg.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($scaled))
+        $memory = New-Object System.IO.MemoryStream
+        $jpeg.Save($memory)
+        $b64 = [Convert]::ToBase64String($memory.ToArray())
+        Write-Host "==APERCU $Name=="
+        for ($i = 0; $i -lt $b64.Length; $i += 4000) { Write-Host $b64.Substring($i, [Math]::Min(4000, $b64.Length - $i)) }
+        Write-Host '==FIN=='
+    }
 }
 
 function Invoke-TdSmokeTest {

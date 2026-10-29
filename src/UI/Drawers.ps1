@@ -46,7 +46,7 @@ function Update-TdDrawer {
         'import' { Build-TdImportPanel $panel }
         'settings' { Build-TdSettingsPanel $panel }
     }
-    $script:Td.Ui.DrawerContent.Content = $panel
+    $script:Td.Ui.DrawerContent.Content = [System.Windows.UIElement]$panel
 }
 
 function Add-TdSection {
@@ -570,7 +570,7 @@ function Build-TdImportPreview {
             if ($it.fixedStart) { $desc += '  ·  ' + $it.fixedStart }
         }
         $cb = New-Object System.Windows.Controls.CheckBox
-        $cb.Content = New-TdText -Text $desc -Wrap
+        $cb.Content = [System.Windows.UIElement](New-TdText -Text $desc -Wrap)
         $cb.IsChecked = -not $it.allDay
         $cb.Margin = New-Object System.Windows.Thickness 0, 4, 0, 4
         $cb.SetResourceReference([System.Windows.Controls.Control]::ForegroundProperty, 'TextBrush')

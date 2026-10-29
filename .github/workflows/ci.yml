@@ -58,6 +58,7 @@ jobs:
         shell: powershell
         run: |
           $env:TDFOCUS_DATA = Join-Path $env:RUNNER_TEMP 'tdfocus-51'
+          $env:TDFOCUS_SMOKE_PREVIEW = '03-minuteur,12-sombre'
           powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File src\TDfocus.ps1 -SmokeTest -Screenshot "$env:RUNNER_TEMP\captures-ps51"
           if ($LASTEXITCODE -ne 0) { throw "Test d'interface en échec ($LASTEXITCODE)" }
       - name: Test d'interface (PowerShell 7)

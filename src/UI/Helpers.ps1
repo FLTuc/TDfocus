@@ -1,4 +1,9 @@
 ﻿# TDfocus - utilitaires d'interface WPF.
+#
+# Attention : PowerShell enveloppe dans un PSObject ce que renvoient New-Object et les
+# fonctions. Les propriétés typées (Background, Child...) le déballent, mais pas les
+# emplacements de type object (Content, Resources[...], Items.Add, données de glisser-
+# déposer) : on y transtype donc explicitement vers le type WPF attendu.
 
 $script:TdXmlns = 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"'
 
@@ -73,7 +78,8 @@ function New-TdButton {
         [scriptblock]$OnClick
     )
     $b = New-Object System.Windows.Controls.Button
-    $b.Content = $Content
+    if ($Content -is [System.Windows.UIElement]) { $b.Content = [System.Windows.UIElement]$Content }
+    elseif ($null -ne $Content) { $b.Content = [string]$Content }
     Set-TdStyle $b $Style
     if ($ToolTip) { $b.ToolTip = $ToolTip }
     $b.Margin = [System.Windows.Thickness](ConvertTo-TdThickness $Margin)
@@ -98,7 +104,7 @@ function New-TdChip {
     else {
         $chip = New-Object System.Windows.Controls.Primitives.ToggleButton
     }
-    $chip.Content = $Content
+    $chip.Content = [string]$Content
     Set-TdStyle $chip 'Chip'
     $chip.IsChecked = $Checked
     if ($null -ne $Tag) { $chip.Tag = $Tag }
@@ -111,8 +117,7 @@ function New-TdSwitch {
     param([Parameter(Mandatory)][string]$Label, [bool]$Checked, [string]$ToolTip, [scriptblock]$OnChange)
     $cb = New-Object System.Windows.Controls.CheckBox
     Set-TdStyle $cb 'Switch'
-    $text = New-TdText -Text $Label -Wrap
-    $cb.Content = $text
+    $cb.Content = [System.Windows.UIElement](New-TdText -Text $Label -Wrap)
     $cb.IsChecked = $Checked
     if ($ToolTip) { $cb.ToolTip = $ToolTip }
     if ($OnChange) {

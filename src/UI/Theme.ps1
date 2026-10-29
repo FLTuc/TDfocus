@@ -72,7 +72,8 @@ function Set-TdTheme {
     if ($Dark) { $name = 'dark' }
     $palette = $script:TdPalettes[$name]
     foreach ($key in $palette.Keys) {
-        $Window.Resources[$key] = New-TdBrush $palette[$key]
+        # Transtypage explicite : sans lui, le dictionnaire recevrait l'enveloppe PSObject.
+        $Window.Resources[$key] = [System.Windows.Media.SolidColorBrush](New-TdBrush $palette[$key])
     }
     Set-TdWindowDarkMode -Window $Window -Dark $Dark
 }
