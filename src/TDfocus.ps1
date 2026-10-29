@@ -66,6 +66,13 @@ try {
             Write-TdLog ('Erreur inattendue : ' + $e.Exception.ToString())
             $e.Handled = $true
         })
+    # Fermeture de session ou arrêt de Windows : on enregistre et on quitte, sans jamais bloquer.
+    $app.Add_SessionEnding({
+            if ($script:Td) {
+                $script:Td.Quitting = $true
+                Stop-TdApp
+            }
+        })
 
     Initialize-TdApp -SourceRoot $PSScriptRoot -ScriptPath $PSCommandPath
     $script:Td.Instance = $instance

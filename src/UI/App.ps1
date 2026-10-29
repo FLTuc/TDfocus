@@ -276,6 +276,7 @@ function Remove-TdTaskNow {
 function Clear-TdListNow {
     $state = Get-TdState
     if ($state.tasks.Count -eq 0) { return }
+    Suspend-TdTimer -State $state -NowMs (Get-TdNowMs)
     $backup = @($state.tasks)
     Clear-TdPending -State $state
     $script:Td.EditingId = $null
