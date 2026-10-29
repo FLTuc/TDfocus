@@ -359,7 +359,6 @@ function Set-TdFocusMode {
         $ui.FocusCard.VerticalAlignment = 'Center'
         $ui.FocusCard.MaxWidth = 860
         $ui.MainColumn.Margin = New-Object System.Windows.Thickness 24, 8, 24, 40
-        $ui.RingHost.Width = 260; $ui.RingHost.Height = 260
         $ui.BtnFocusMode.Content = [string][char]0xE73F
         $ui.BtnFocusMode.ToolTip = 'Quitter le mode focus (Échap)'
     }
@@ -371,10 +370,10 @@ function Set-TdFocusMode {
         $ui.FocusCard.VerticalAlignment = 'Stretch'
         $ui.FocusCard.MaxWidth = [double]::PositiveInfinity
         $ui.MainColumn.Margin = New-Object System.Windows.Thickness 24, 8, 24, 0
-        $ui.RingHost.Width = 210; $ui.RingHost.Height = 210
         $ui.BtnFocusMode.Content = [string][char]0xE740
         $ui.BtnFocusMode.ToolTip = 'Mode focus (F)'
     }
+    Update-TdResponsiveLayout
     Update-TdView
 }
 
@@ -1023,6 +1022,14 @@ function Register-TdMainEvents {
 function Update-TdResponsiveLayout {
     $ui = $script:Td.Ui
     $narrow = $ui.MainColumn.ActualWidth -gt 0 -and $ui.MainColumn.ActualWidth -lt 640
+    # Anneau : grand en mode focus, compact quand la carte s'empile (fenêtre étroite ou panneau ouvert).
+    $ring = 210
+    if ($script:Td.FocusMode) { $ring = 260 } elseif ($narrow) { $ring = 160 }
+    if ($ui.RingHost.Width -ne $ring) {
+        $ui.RingHost.Width = $ring
+        $ui.RingHost.Height = $ring
+        $ui.TimerText.FontSize = [Math]::Round($ring * 0.24)
+    }
     if ($narrow) {
         [System.Windows.Controls.Grid]::SetColumn($ui.FocusDetails, 0)
         [System.Windows.Controls.Grid]::SetRow($ui.FocusDetails, 1)

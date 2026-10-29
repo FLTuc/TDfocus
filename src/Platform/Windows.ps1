@@ -51,12 +51,17 @@ function Set-TdWindowDarkMode {
     catch { $null = $_ }
 }
 
+# Lectures de registre avec -ErrorAction Ignore : une valeur absente est un cas normal,
+# elle ne doit pas finir dans $Error (et donc dans tdfocus.log).
+function Get-TdRegistryValue {
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Name)
+    $item = Get-ItemProperty -LiteralPath $Path -Name $Name -ErrorAction Ignore
+    if ($null -eq $item) { return $null }
+    $item.$Name
+}
+
 function Test-TdSystemDarkTheme {
-    try {
-        $value = Get-ItemPropertyValue -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop
-        return ($value -eq 0)
-    }
-    catch { return $false }
+    (Get-TdRegistryValue -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme') -eq 0
 }
 
 function Get-TdPowerShellExe {
@@ -78,8 +83,7 @@ function Get-TdAutostartCommand {
 }
 
 function Get-TdAutostartValue {
-    try { return (Get-ItemPropertyValue -Path $script:TdRunKey -Name $script:TdRunName -ErrorAction Stop) }
-    catch { return $null }
+    Get-TdRegistryValue -Path $script:TdRunKey -Name $script:TdRunName
 }
 
 function Set-TdAutostart {
@@ -107,11 +111,8 @@ function Set-TdAutostart {
 function Test-TdAutostartBlockedByUser {
     # Vrai si l'utilisateur a désactivé TDfocus dans Paramètres > Applications > Démarrage
     # (ou dans le Gestionnaire des tâches). On respecte ce choix.
-    try {
-        $bytes = Get-ItemPropertyValue -Path $script:TdStartupApprovedKey -Name $script:TdRunName -ErrorAction Stop
-        return ($bytes -and $bytes.Length -gt 0 -and ($bytes[0] -band 1) -eq 1)
-    }
-    catch { return $false }
+    $bytes = Get-TdRegistryValue -Path $script:TdStartupApprovedKey -Name $script:TdRunName
+    [bool]($bytes -and $bytes.Length -gt 0 -and ($bytes[0] -band 1) -eq 1)
 }
 
 function Enter-TdSingleInstance {
