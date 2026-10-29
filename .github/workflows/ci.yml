@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: Cœur logique (PowerShell 7, Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Outils
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+      - name: Analyse statique (compatibilité Windows PowerShell 5.1)
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+          $results | Format-Table -AutoSize RuleName, Severity, ScriptName, Line, Message | Out-String -Width 200 | Write-Host
+          if ($results | Where-Object Severity -eq 'Error') { throw 'PSScriptAnalyzer a trouvé des erreurs.' }
+      - name: Tests Pester
+        shell: pwsh
+        run: Invoke-Pester -Path tests -CI
+
+  windows:
+    name: Windows (PowerShell 5.1 et 7, interface WPF)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pester
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+          if (-not (Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.5' })) {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force | Out-Null
+            Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+      - name: Tests Pester (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          Import-Module Pester -MinimumVersion 5.5
+          $PSVersionTable.PSVersion
+          Invoke-Pester -Path tests -CI
+      - name: Tests Pester (PowerShell 7)
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.5' })) {
+            Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          Import-Module Pester -MinimumVersion 5.5
+          Invoke-Pester -Path tests -CI
+      - name: Test d'interface (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $env:TDFOCUS_DATA = Join-Path $env:RUNNER_TEMP 'tdfocus-51'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File src\TDfocus.ps1 -SmokeTest -Screenshot "$env:RUNNER_TEMP\captures-ps51"
+          if ($LASTEXITCODE -ne 0) { throw "Test d'interface en échec ($LASTEXITCODE)" }
+      - name: Test d'interface (PowerShell 7)
+        shell: pwsh
+        run: |
+          $env:TDFOCUS_DATA = Join-Path $env:RUNNER_TEMP 'tdfocus-7'
+          pwsh -NoProfile -ExecutionPolicy Bypass -STA -File src\TDfocus.ps1 -SmokeTest -Screenshot "$env:RUNNER_TEMP\captures-ps7"
+          if ($LASTEXITCODE -ne 0) { throw "Test d'interface en échec ($LASTEXITCODE)" }
+      - name: Journal de l'application
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem $env:RUNNER_TEMP -Recurse -Filter 'tdfocus.log' | ForEach-Object { Write-Host "== $($_.FullName)"; Get-Content $_.FullName -Tail 80 }
+      - name: Captures d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-interface
+          path: |
+            ${{ runner.temp }}/captures-ps51
+            ${{ runner.temp }}/captures-ps7
+          if-no-files-found: ignore
