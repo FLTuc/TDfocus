@@ -13,6 +13,20 @@ paralysie de la décision.
 - **Se lance toute seule** à l'ouverture de session Windows (option désactivable).
 - **100 % locale et hors ligne** : pas de compte, pas de serveur, pas de télémétrie.
 
+![Tâche en cours, heure de fin de la liste et file d'attente avec heures projetées](docs/captures/minuteur.png)
+
+| Thème sombre | Mode focus |
+|---|---|
+| ![Thème sombre](docs/captures/sombre.png) | ![Mode focus : uniquement la tâche, le minuteur et la suivante](docs/captures/focus.png) |
+| **Estimé vs réel** | **Sons et carillons** |
+| ![Statistiques estimé vs réel](docs/captures/statistiques.png) | ![Ambiances sonores et carillon périodique](docs/captures/sons.png) |
+
+Mode compact flottant, toujours au premier plan :
+
+![Mode compact](docs/captures/compact.png)
+
+*Captures réalisées automatiquement par l'intégration continue, sous Windows PowerShell 5.1.*
+
 ---
 
 ## Installation (sans droits administrateur)
@@ -196,7 +210,10 @@ Invoke-Pester -Path tests
   syntaxe, éléments XAML et fonctions référencés.
 - `tests/Gui.Smoke.ps1` : scénario d'interface complet sous Windows
   (`src\TDfocus.ps1 -SmokeTest -Screenshot <dossier>`), exécuté par l'intégration continue
-  avec Windows PowerShell 5.1 et PowerShell 7.
+  avec Windows PowerShell 5.1 et PowerShell 7 (captures d'écran en artefact).
+- L'intégration continue installe aussi TDfocus dans le profil utilisateur. Elle vérifie la
+  clé de démarrage automatique et le raccourci, lance la commande exacte inscrite au
+  démarrage, puis désinstalle et contrôle qu'il ne reste rien.
 
 ## Limites connues
 

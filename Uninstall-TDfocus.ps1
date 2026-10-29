@@ -31,12 +31,13 @@ foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::G
 $sounds = Join-Path $env:LOCALAPPDATA 'TDfocus'
 if (Test-Path -LiteralPath $sounds) { Remove-Item -LiteralPath $sounds -Recurse -Force -ErrorAction SilentlyContinue }
 
+$data = $env:TDFOCUS_DATA
+if (-not $data) { $data = Join-Path $env:APPDATA 'TDfocus' }
 if ($RemoveData) {
-    $data = Join-Path $env:APPDATA 'TDfocus'
     if (Test-Path -LiteralPath $data) { Remove-Item -LiteralPath $data -Recurse -Force; Write-Host "  Données supprimées : $data" }
 }
 else {
-    Write-Host "  Données conservées dans $(Join-Path $env:APPDATA 'TDfocus') (utiliser -RemoveData pour les effacer)."
+    Write-Host "  Données conservées dans $data (utiliser -RemoveData pour les effacer)."
 }
 
 if (Test-Path -LiteralPath $Destination) {
