@@ -127,6 +127,7 @@ function Invoke-TdSmokeTest {
     Wait-TdUi 1300
     Assert-Td ($ui.TimerText.Text -ne $text) "le minuteur s'écoule ($text -> $($ui.TimerText.Text))"
     Assert-Td ($w.Title -match 'Répondre aux emails') 'temps restant dans le titre de la fenêtre'
+    Assert-Td ($ui.FocusCard.ActualHeight -le 140) "carte de la tâche en cours compacte ($([int]$ui.FocusCard.ActualHeight) px de haut)"
     Save-TdScreenshot '03-minuteur'
 
     # Note sur la tâche
@@ -268,6 +269,7 @@ function Invoke-TdSmokeTest {
     # Modes d'affichage
     Invoke-TdClick $ui.BtnFocusMode
     Assert-Td ($script:Td.FocusMode -and $ui.ListScroll.Visibility -eq 'Collapsed') 'mode focus : la liste passe en retrait'
+    Assert-Td ($ui.FocusActive.LayoutTransform.ScaleX -gt 1.2) "mode focus : la carte est agrandie (×$($ui.FocusActive.LayoutTransform.ScaleX))"
     Save-TdScreenshot '10-focus'
     Invoke-TdClick $ui.BtnFocusMode
     Invoke-TdClick $ui.BtnCompact

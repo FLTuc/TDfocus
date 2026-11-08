@@ -654,6 +654,8 @@ function Update-TdFocusCard {
     $ui.FocusEmpty.Visibility = 'Collapsed'
 
     $ui.CurrentTitle.Text = $current.title
+    # Titre sur une ligne (carte compacte) : le titre complet reste lisible au survol.
+    $ui.CurrentTitle.ToolTip = '{0}  (double-clic pour modifier)' -f $current.title
     $category = Get-TdCategory $settings $current.categoryId
     if ($category) {
         $ui.CurrentCategory.Visibility = 'Visible'
@@ -710,7 +712,7 @@ function Update-TdFocusCard {
         $ui.RingArc.SetResourceReference([System.Windows.Shapes.Shape]::StrokeProperty, 'AccentBrush')
         $ui.TimerText.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'TextBrush')
     }
-    $ui.RingArc.Data = Get-TdArcGeometry -Size $ui.RingHost.Width -Thickness 12 -Fraction $fraction
+    $ui.RingArc.Data = Get-TdArcGeometry -Size $ui.RingHost.Width -Thickness $ui.RingTrack.StrokeThickness -Fraction $fraction
 
     # Ancrage temporel de la tâche
     $item = $null
@@ -1185,34 +1187,24 @@ function Register-TdMainEvents {
 }
 
 function Update-TdResponsiveLayout {
+    # Carte de la tâche en cours compacte (anneau de 96 px, une ligne de boutons). En mode focus,
+    # où elle est seule à l'écran, elle est agrandie d'un bloc (jusqu'à ×1,5) selon la largeur.
     $ui = $script:Td.Ui
-    $narrow = $ui.MainColumn.ActualWidth -gt 0 -and $ui.MainColumn.ActualWidth -lt 640
-    # Anneau : grand en mode focus, compact quand la carte s'empile (fenêtre étroite ou panneau ouvert).
-    $ring = 210
-    if ($script:Td.FocusMode) { $ring = 260 } elseif ($narrow) { $ring = 160 }
+    $ring = 96
+    $scale = 1.0
+    if ($script:Td.FocusMode) {
+        $ring = 150
+        $width = $ui.MainColumn.ActualWidth
+        if ($width -gt 0) { $scale = [Math]::Max(1.0, [Math]::Min(1.5, $width / 620)) }
+    }
     if ($ui.RingHost.Width -ne $ring) {
         $ui.RingHost.Width = $ring
         $ui.RingHost.Height = $ring
-        $ui.TimerText.FontSize = [Math]::Round($ring * 0.24)
+        $ui.TimerText.FontSize = [Math]::Round($ring * 0.23)
     }
-    if ($narrow) {
-        [System.Windows.Controls.Grid]::SetColumn($ui.FocusDetails, 0)
-        [System.Windows.Controls.Grid]::SetRow($ui.FocusDetails, 1)
-        [System.Windows.Controls.Grid]::SetRow($ui.TaskNoteBox, 2)
-        if ($ui.FocusActive.RowDefinitions.Count -lt 3) { $ui.FocusActive.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition)) }
-        $ui.RingHost.Margin = New-Object System.Windows.Thickness 0, 0, 0, 16
-        $ui.RingHost.HorizontalAlignment = 'Center'
-        [System.Windows.Controls.Grid]::SetColumnSpan($ui.RingHost, 2)
-        [System.Windows.Controls.Grid]::SetColumnSpan($ui.FocusDetails, 2)
-    }
-    else {
-        [System.Windows.Controls.Grid]::SetColumn($ui.FocusDetails, 1)
-        [System.Windows.Controls.Grid]::SetRow($ui.FocusDetails, 0)
-        [System.Windows.Controls.Grid]::SetRow($ui.TaskNoteBox, 1)
-        $ui.RingHost.Margin = New-Object System.Windows.Thickness 0, 0, 28, 0
-        $ui.RingHost.HorizontalAlignment = 'Stretch'
-        [System.Windows.Controls.Grid]::SetColumnSpan($ui.RingHost, 1)
-        [System.Windows.Controls.Grid]::SetColumnSpan($ui.FocusDetails, 1)
+    $transform = $ui.FocusActive.LayoutTransform
+    if (-not ($transform -is [System.Windows.Media.ScaleTransform]) -or [Math]::Abs($transform.ScaleX - $scale) -gt 0.01) {
+        $ui.FocusActive.LayoutTransform = [System.Windows.Media.Transform](New-Object System.Windows.Media.ScaleTransform $scale, $scale)
     }
 }
 

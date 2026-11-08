@@ -322,7 +322,8 @@
           </Grid.RowDefinitions>
 
           <!-- Carte de la tâche en cours -->
-          <Border x:Name="FocusCard" Grid.Row="0" Style="{StaticResource Card}" Padding="26,22" AllowDrop="True">
+          <!-- Carte compacte (moitié de l'ancienne hauteur) ; agrandie par le code en mode focus. -->
+          <Border x:Name="FocusCard" Grid.Row="0" Style="{StaticResource Card}" Padding="18,12" AllowDrop="True">
             <Grid>
               <!-- Tâche active -->
               <Grid x:Name="FocusActive">
@@ -334,43 +335,43 @@
                   <RowDefinition Height="Auto"/>
                   <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Grid x:Name="RingHost" Width="210" Height="210" Margin="0,0,28,0" VerticalAlignment="Center">
-                  <Ellipse x:Name="RingTrack" Stroke="{DynamicResource TrackBrush}" StrokeThickness="12"/>
-                  <Path x:Name="RingArc" Stroke="{DynamicResource AccentBrush}" StrokeThickness="12" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                <Grid x:Name="RingHost" Width="96" Height="96" Margin="0,0,20,0" VerticalAlignment="Center">
+                  <Ellipse x:Name="RingTrack" Stroke="{DynamicResource TrackBrush}" StrokeThickness="7"/>
+                  <Path x:Name="RingArc" Stroke="{DynamicResource AccentBrush}" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                   <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock x:Name="TimerText" Text="25:00" FontFamily="{StaticResource DisplayFont}" FontWeight="Light" FontSize="50" HorizontalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
-                    <TextBlock x:Name="TimerSub" Text="restant" Foreground="{DynamicResource MutedBrush}" FontSize="13" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TimerText" Text="25:00" FontFamily="{StaticResource DisplayFont}" FontWeight="Light" FontSize="22" HorizontalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
+                    <TextBlock x:Name="TimerSub" Text="restant" Foreground="{DynamicResource MutedBrush}" FontSize="10" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Grid>
                 <StackPanel x:Name="FocusDetails" Grid.Column="1" VerticalAlignment="Center">
-                  <Border x:Name="CheckInBar" Visibility="Collapsed" CornerRadius="14" Padding="14,10,10,6" Margin="0,0,0,12" Background="{DynamicResource SuccessSoftBrush}">
+                  <Border x:Name="CheckInBar" Visibility="Collapsed" CornerRadius="12" Padding="12,5,6,1" Margin="0,0,0,6" Background="{DynamicResource SuccessSoftBrush}">
                     <WrapPanel>
-                      <TextBlock x:Name="CheckInText" Text="Toujours sur ta tâche ?" FontWeight="SemiBold" Foreground="{DynamicResource SuccessTextBrush}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,4"/>
-                      <Button x:Name="BtnCheckInYes" Style="{StaticResource PillButton}" Content="Oui, je suis dessus" Background="{DynamicResource SurfaceBrush}" Margin="0,0,6,4"/>
-                      <Button x:Name="BtnCheckInDrift" Style="{StaticResource PillButton}" Content="Je me suis égaré·e" Background="{DynamicResource SurfaceBrush}" Margin="0,0,0,4"/>
+                      <TextBlock x:Name="CheckInText" Text="Toujours sur ta tâche ?" FontWeight="SemiBold" Foreground="{DynamicResource SuccessTextBrush}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,4"/>
+                      <Button x:Name="BtnCheckInYes" Style="{StaticResource PillButton}" Padding="12,4" Content="Oui, je suis dessus" Background="{DynamicResource SurfaceBrush}" Margin="0,0,6,4"/>
+                      <Button x:Name="BtnCheckInDrift" Style="{StaticResource PillButton}" Padding="12,4" Content="Je me suis égaré·e" Background="{DynamicResource SurfaceBrush}" Margin="0,0,0,4"/>
                     </WrapPanel>
                   </Border>
-                  <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <Border x:Name="CurrentCategory" CornerRadius="999" Padding="10,3" Background="{DynamicResource SurfaceAltBrush}" Margin="0,0,8,0">
-                      <TextBlock x:Name="CurrentCategoryText" Text="Travail" FontSize="12" FontWeight="SemiBold"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                    <Border x:Name="CurrentCategory" CornerRadius="999" Padding="8,1" Background="{DynamicResource SurfaceAltBrush}" Margin="0,0,8,0">
+                      <TextBlock x:Name="CurrentCategoryText" Text="Travail" FontSize="11" FontWeight="SemiBold"/>
                     </Border>
                     <TextBlock x:Name="CurrentState" Text="En pause" Foreground="{DynamicResource MutedBrush}" FontSize="12" VerticalAlignment="Center"/>
                   </StackPanel>
-                  <TextBlock x:Name="CurrentTitle" Text="Tâche" FontFamily="{StaticResource DisplayFont}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                  <Border x:Name="StepPanel" Visibility="Collapsed" CornerRadius="14" Padding="14,10,10,10" Margin="0,2,0,10" Background="{DynamicResource AccentSoftBrush}">
+                  <TextBlock x:Name="CurrentTitle" Text="Tâche" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,0,0,1"/>
+                  <Border x:Name="StepPanel" Visibility="Collapsed" CornerRadius="12" Padding="12,3,4,3" Margin="0,3,0,4" Background="{DynamicResource AccentSoftBrush}">
                     <Grid>
                       <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
-                      <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                        <TextBlock x:Name="StepCounter" Text="ÉTAPE 1 / 3" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
-                        <TextBlock x:Name="StepTitle" Text="Étape" FontSize="16" TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}" Margin="0,2,0,0"/>
-                        <TextBlock x:Name="StepDots" Text="" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0"/>
-                      </StackPanel>
-                      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnStepUndo" Style="{StaticResource SmallIconButton}" Content="&#xE7A7;" ToolTip="Revenir à l'étape précédente" Margin="0,0,4,0"/>
-                        <Button x:Name="BtnStepDone" Style="{StaticResource PillButton}" Background="{DynamicResource SurfaceBrush}" ToolTip="Étape faite (S)">
+                      <TextBlock x:Name="StepCounter" Text="ÉTAPE 1 / 3" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                      <TextBlock x:Name="StepTitle" Grid.Column="1" Text="Étape" FontSize="14" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                      <TextBlock x:Name="StepDots" Grid.Column="2" Text="" FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnStepUndo" Style="{StaticResource SmallIconButton}" Width="26" Height="26" Content="&#xE7A7;" ToolTip="Revenir à l'étape précédente" Margin="0,0,2,0"/>
+                        <Button x:Name="BtnStepDone" Style="{StaticResource PillButton}" Padding="10,3" Background="{DynamicResource SurfaceBrush}" ToolTip="Étape faite (S)">
                           <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource AccentBrush}"/>
                             <TextBlock Text="Étape faite" VerticalAlignment="Center"/>
@@ -379,42 +380,40 @@
                       </StackPanel>
                     </Grid>
                   </Border>
-                  <TextBlock x:Name="CurrentMeta" Text="" Style="{StaticResource Muted}" FontSize="14" Margin="0,0,0,4"/>
-                  <TextBlock x:Name="LandingHint" Text="" Foreground="{DynamicResource AccentBrush}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,4"/>
-                  <TextBlock x:Name="OvertimeHint" Text="" Foreground="{DynamicResource OvertimeBrush}" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,4"/>
-                  <TextBlock x:Name="NextLine" Text="" Style="{StaticResource Muted}" Visibility="Collapsed" Margin="0,0,0,4"/>
-                  <WrapPanel Margin="0,12,0,0">
-                    <Button x:Name="BtnMinus5" Style="{StaticResource PillButton}" Content="−5" ToolTip="Retirer 5 minutes" Margin="0,0,6,8" Width="46"/>
-                    <Button x:Name="BtnMinus1" Style="{StaticResource PillButton}" Content="−1" ToolTip="Retirer 1 minute (−)" Margin="0,0,10,8" Width="46"/>
-                    <Button x:Name="BtnStartPause" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" ToolTip="Démarrer / pause (Espace)" MinWidth="132">
+                  <TextBlock x:Name="CurrentMeta" Text="" Style="{StaticResource Muted}" FontSize="13" Margin="0"/>
+                  <TextBlock x:Name="LandingHint" Text="" Foreground="{DynamicResource AccentBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
+                  <TextBlock x:Name="OvertimeHint" Text="" Foreground="{DynamicResource OvertimeBrush}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
+                  <TextBlock x:Name="NextLine" Text="" Style="{StaticResource Muted}" Visibility="Collapsed" Margin="0,2,0,0"/>
+                  <WrapPanel Margin="0,7,0,0">
+                    <Button x:Name="BtnMinus5" Style="{StaticResource PillButton}" Padding="0,5" Content="−5" ToolTip="Retirer 5 minutes" Margin="0,0,4,4" Width="38"/>
+                    <Button x:Name="BtnMinus1" Style="{StaticResource PillButton}" Padding="0,5" Content="−1" ToolTip="Retirer 1 minute (−)" Margin="0,0,8,4" Width="38"/>
+                    <Button x:Name="BtnStartPause" Style="{StaticResource PrimaryButton}" Padding="16,5" Margin="0,0,6,4" ToolTip="Démarrer / pause (Espace)" MinWidth="108">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="StartPauseIcon" Text="&#xE768;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock x:Name="StartPauseText" Text="Démarrer" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
-                    <Button x:Name="BtnDone" Style="{StaticResource SuccessButton}" Margin="0,0,10,8" ToolTip="Valider la tâche (Ctrl + Entrée)">
+                    <Button x:Name="BtnDone" Style="{StaticResource SuccessButton}" Padding="16,5" Margin="0,0,8,4" ToolTip="Valider la tâche (Ctrl + Entrée)">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="Terminé" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
-                    <Button x:Name="BtnPlus1" Style="{StaticResource PillButton}" Content="+1" ToolTip="Ajouter 1 minute (+)" Margin="0,0,6,8" Width="46"/>
-                    <Button x:Name="BtnPlus5" Style="{StaticResource PillButton}" Content="+5" ToolTip="Ajouter 5 minutes" Margin="0,0,6,8" Width="46"/>
-                  </WrapPanel>
-                  <WrapPanel>
-                    <Button x:Name="BtnTimerMode" Style="{StaticResource GhostButton}" ToolTip="Basculer décompte / compte progressif">
+                    <Button x:Name="BtnPlus1" Style="{StaticResource PillButton}" Padding="0,5" Content="+1" ToolTip="Ajouter 1 minute (+)" Margin="0,0,4,4" Width="38"/>
+                    <Button x:Name="BtnPlus5" Style="{StaticResource PillButton}" Padding="0,5" Content="+5" ToolTip="Ajouter 5 minutes" Margin="0,0,10,4" Width="38"/>
+                    <Button x:Name="BtnTimerMode" Style="{StaticResource GhostButton}" Padding="8,5" Margin="0,0,0,4" ToolTip="Basculer décompte / compte progressif">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE916;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="TimerModeText" Text="Décompte" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
-                    <Button x:Name="BtnLater" Style="{StaticResource GhostButton}" ToolTip="Reporter en fin de liste, sans culpabiliser (L)">
+                    <Button x:Name="BtnLater" Style="{StaticResource GhostButton}" Padding="8,5" Margin="0,0,0,4" ToolTip="Reporter en fin de liste, sans culpabiliser (L)">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE72A;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Plus tard" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
-                    <Button x:Name="BtnTaskNote" Style="{StaticResource GhostButton}" ToolTip="Note sur cette tâche">
+                    <Button x:Name="BtnTaskNote" Style="{StaticResource GhostButton}" Padding="8,5" Margin="0,0,0,4" ToolTip="Note sur cette tâche">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE70B;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="TaskNoteText" Text="Note" VerticalAlignment="Center"/>
@@ -422,7 +421,7 @@
                     </Button>
                   </WrapPanel>
                 </StackPanel>
-                <TextBox x:Name="TaskNoteBox" Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource Field}" Margin="0,14,0,0" MinHeight="70" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" Visibility="Collapsed" ToolTip="Notes de la tâche : enregistrées automatiquement"/>
+                <TextBox x:Name="TaskNoteBox" Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource Field}" Margin="0,8,0,0" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" Visibility="Collapsed" ToolTip="Notes de la tâche : enregistrées automatiquement"/>
               </Grid>
 
               <!-- État vide / liste terminée -->
