@@ -16,7 +16,7 @@ paralysie de la décision.
   flash de console sous Windows.
 - **100 % locale et hors ligne** : pas de compte, pas de serveur, pas de télémétrie.
 
-![Tâche en cours, heure de fin de la liste et file d'attente avec heures projetées](docs/captures/minuteur.png)
+![Tâche en cours et file d'attente avec heures de fin projetées](docs/captures/minuteur.png)
 
 | Thème sombre | Mode focus |
 |---|---|
@@ -130,11 +130,11 @@ Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemp
 
 ### Ancrage temporel
 
-- **Heure de fin de la liste** en haut de la fenêtre, recalculée en continu à partir de
-  l'heure réelle.
-- **Heure de fin projetée** sur chaque tâche de la file.
-- **Décalage visible** : dès qu'une tâche déborde ou qu'une pause s'allonge, un badge
-  `+6 min` indique l'effet sur la fin de journée (ou `−4 min` en avance).
+- **Heure de fin projetée** sur chaque tâche de la file, recalculée en continu à partir de
+  l'heure réelle : celle de la dernière tâche est l'heure de fin de la liste.
+- **Dépassement visible** : quand une tâche déborde, la carte indique à quelle heure la fin
+  de la liste glisse. La version Linux affiche en plus, en haut de l'écran, l'heure de fin de
+  la liste et le décalage (`+6 min`, ou `−4 min` en avance).
 - **Créneaux figés** : une réunion à 14:00 ne commence pas avant 14:00. Le temps libre
   avant elle est affiché, et un éventuel retard est signalé avec douceur.
 - Le temps restant figure aussi dans le **titre de la fenêtre** et l'**info-bulle de la zone

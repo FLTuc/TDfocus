@@ -293,15 +293,6 @@
           <TextBlock Text="TDfocus" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
           <TextBlock x:Name="ClockText" Text="09:41" Margin="18,0,0,0" FontFamily="{StaticResource DisplayFont}" FontSize="20" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Typography.NumeralAlignment="Tabular" ToolTip="Heure actuelle"/>
         </StackPanel>
-        <Border x:Name="EndPill" Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource AccentSoftBrush}" CornerRadius="999" Padding="16,7" Margin="12,0">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock x:Name="EndLabel" Text="Fin de la liste" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
-            <TextBlock x:Name="EndTime" Text="—" Margin="8,0,0,0" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" FontSize="16" VerticalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
-            <Border x:Name="DriftBadge" Margin="10,0,0,0" CornerRadius="999" Padding="8,1" Background="{DynamicResource OvertimeSoftBrush}" Visibility="Collapsed" VerticalAlignment="Center">
-              <TextBlock x:Name="DriftText" Text="+5 min" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource OvertimeBrush}"/>
-            </Border>
-          </StackPanel>
-        </Border>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
           <Button x:Name="BtnSounds" Style="{StaticResource IconButton}" Content="&#xE7F6;" ToolTip="Sons et carillons"/>
           <Button x:Name="BtnTemplates" Style="{StaticResource IconButton}" Content="&#xE8FD;" ToolTip="Routines"/>

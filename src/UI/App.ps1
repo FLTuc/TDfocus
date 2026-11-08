@@ -774,38 +774,6 @@ function Update-TdHeader {
     $ui = $script:Td.Ui
     $state = Get-TdState
     $ui.ClockText.Text = Format-TdClock $NowMs
-    if ($Schedule.count -eq 0) {
-        $ui.EndLabel.Text = 'Aucune tâche prévue'
-        $ui.EndTime.Visibility = 'Collapsed'
-        $ui.DriftBadge.Visibility = 'Collapsed'
-        $ui.EndPill.ToolTip = $null
-    }
-    else {
-        $ui.EndLabel.Text = 'Fin de la liste'
-        $ui.EndTime.Text = Format-TdClock $Schedule.endMs
-        $ui.EndTime.Visibility = 'Visible'
-        $ui.EndPill.ToolTip = 'Heure à laquelle toute la liste sera terminée ({0} de travail restant). Recalculée en continu.' -f (Format-TdDurationMs $Schedule.remainingMs)
-        $drift = Get-TdDriftMs -State $state -Schedule $Schedule
-        $driftMin = [long][Math]::Round($drift / 60000)
-        if ([Math]::Abs($driftMin) -ge 1) {
-            $ui.DriftBadge.Visibility = 'Visible'
-            if ($driftMin -gt 0) {
-                $ui.DriftText.Text = '+{0} min' -f $driftMin
-                $ui.DriftBadge.SetResourceReference([System.Windows.Controls.Border]::BackgroundProperty, 'OvertimeSoftBrush')
-                $ui.DriftText.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'OvertimeBrush')
-                $ui.DriftBadge.ToolTip = 'Décalage dû aux dépassements et aux pauses depuis ta dernière modification du plan.'
-            }
-            else {
-                $ui.DriftText.Text = '{0} min' -f $driftMin
-                $ui.DriftBadge.SetResourceReference([System.Windows.Controls.Border]::BackgroundProperty, 'SuccessSoftBrush')
-                $ui.DriftText.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'SuccessTextBrush')
-                $ui.DriftBadge.ToolTip = 'En avance sur ton plan.'
-            }
-        }
-        else {
-            $ui.DriftBadge.Visibility = 'Collapsed'
-        }
-    }
 
     # Titre de fenêtre et info-bulle de la zone de notification : le temps reste visible partout.
     $current = Get-TdCurrentTask $state

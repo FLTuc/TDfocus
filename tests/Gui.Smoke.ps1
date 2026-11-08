@@ -126,7 +126,6 @@ function Invoke-TdSmokeTest {
     $text = $ui.TimerText.Text
     Wait-TdUi 1300
     Assert-Td ($ui.TimerText.Text -ne $text) "le minuteur s'écoule ($text -> $($ui.TimerText.Text))"
-    Assert-Td ($ui.EndTime.Text -match '^\d{2}:\d{2}$') "heure de fin de liste affichée ($($ui.EndTime.Text))"
     Assert-Td ($w.Title -match 'Répondre aux emails') 'temps restant dans le titre de la fenêtre'
     Save-TdScreenshot '03-minuteur'
 
