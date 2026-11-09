@@ -56,6 +56,11 @@ clignote** à l'ouverture de session ni au clic sur un raccourci. Si sa compilat
 bloquée (stratégie d'entreprise), l'installateur revient à un lancement direct de
 PowerShell.
 
+Si TDfocus est lancé depuis une fenêtre PowerShell (`TDfocus.cmd`, ancien raccourci,
+ancienne clé de démarrage, Windows Terminal), il passe aussitôt la main à `TDfocus.exe`
+et **cette fenêtre se ferme d'elle-même**. Le lanceur est créé au besoin à côté de
+l'application, toujours sans droits administrateur.
+
 - **Lancer sans installer** : `TDfocus.cmd`.
 - **Désinstaller** : `Uninstall.cmd` (ajouter `-RemoveData` pour effacer aussi les données).
 - **Prérequis** : Windows 10 ou 11 avec Windows PowerShell 5.1, déjà inclus. Rien à
@@ -108,7 +113,8 @@ Il suffit d'écrire, puis de valider avec Entrée :
 | `Visio client à 9h30 45m` | 45 min, créneau figé à 09:30 |
 
 Sous le champ se trouvent les **pastilles de durée** (5, 15, 25, 45, 60 min), les
-**catégories** (émoji et couleur douce, sans sous-dossiers) et un champ **heure fixe**.
+**catégories** professionnelles (Production, Réunions, E-mails, Admin, Veille, Pause, avec
+émoji et couleur douce, sans sous-dossiers) et un champ **heure fixe**.
 Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemple :
 *« d'après ton historique, cela prend plutôt ~32 min (×1,3) »*.
 
@@ -218,7 +224,7 @@ Pourquoi ces choix :
 | Bouton | Contenu |
 |---|---|
 | 🚩 Projets et quotidien | Projets au long cours (pas, blocs, note de reprise, échéance, 3 en cours au plus) et actions récurrentes ajoutées toutes seules |
-| 📋 Routines | Routine du matin, sprint de deep work, closing de fin de journée, ou toute liste enregistrée en un clic |
+| 📋 Routines | Routine du matin, sprint de deep work, routine de fin de journée, ou toute liste enregistrée, chargées en un clic. **Toutes modifiables** (crayon), y compris celles d'origine : nom, tâches, durées, sous-étapes, ordre. « Rétablir l'original » à tout moment |
 | 📝 Bloc-notes | « Parking à idées » : noter une pensée parasite sans quitter la tâche, puis en faire une tâche plus tard. Chaque tâche a aussi sa propre note |
 | 📊 Estimé vs réel | Graphique des 7 derniers jours, facteur d'estimation médian, détail par catégorie. Aucun score négatif, aucune série à perdre |
 | ⇩ Importer | Google Agenda / Outlook (adresse iCal secrète ou fichier `.ics`), Todoist (jeton d'API), Notion (intégration), texte collé (listes Markdown, copier-coller Notion…) |
@@ -264,10 +270,11 @@ terminal.
 | z | Annuler la dernière action |
 | o / g | Pendant un point de contrôle : oui / je me suis égaré·e |
 | n / N | Note rapide / bloc-notes |
-| P | Projets (Tab : quotidien). Entrée ajoute un bloc, `a` crée un projet (« nom ; pourquoi ; échéance »), `s` ajoute un pas, `f` coche le prochain, `j` note où tu en es, `p` met en attente |
+| P | Projets (Tab : quotidien). Entrée ajoute un bloc, `a` crée un projet (« nom ; pourquoi ; échéance »), `s` ajoute un pas, `f` coche le prochain, `j` note où tu en es, `p` met en attente. Dans le quotidien, `e` modifie une action |
 | b / B | Rappel du projet qui attend : ajouter un bloc aujourd'hui / pas aujourd'hui |
 | j | Après un bloc projet : noter où tu t'arrêtes |
-| r / t / o / ? | Routines / statistiques / réglages / aide |
+| r | Routines : Entrée ou 1-9 pour charger, `e` pour modifier (ajouter, modifier, retirer, réordonner les tâches, renommer, `s` pour enregistrer), `x` supprimer, `R` rétablir l'original |
+| t / o / ? | Statistiques / réglages / aide |
 | q | Quitter (le minuteur continue de compter) |
 
 ---
