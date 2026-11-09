@@ -230,6 +230,10 @@ Pourquoi ces choix :
 | ⇩ Importer | Google Agenda / Outlook (adresse iCal secrète ou fichier `.ics`), Todoist (jeton d'API), Notion (intégration), texte collé (listes Markdown, copier-coller Notion…) |
 | ⚙ Réglages | Thème (comme Windows / clair / sombre), minuteur, démarrage, catégories, sauvegarde et restauration |
 
+Chaque routine se modifie avec le crayon, y compris celles d'origine :
+
+![Modifier la routine du matin : tâches, durées, sous-étapes, ordre](docs/captures/routine-edition.png)
+
 ### Raccourcis clavier
 
 | Touche | Action |
