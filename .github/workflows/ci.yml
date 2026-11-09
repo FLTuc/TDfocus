@@ -167,6 +167,20 @@ jobs:
           if ((Test-Path $log) -and (Select-String -Path $log -Pattern 'Échec' -Quiet)) { throw 'Erreur au démarrage' }
           if (-not (Test-Path (Join-Path $env:TDFOCUS_DATA 'state.json'))) { throw 'Aucune donnée enregistrée' }
           $running | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+          Start-Sleep -Seconds 2
+
+          # Lancé depuis une fenêtre PowerShell visible (ancien raccourci, TDfocus.cmd, terminal) :
+          # TDfocus.exe prend le relais et la fenêtre se ferme d'elle-même.
+          $before = @([TdCi.Win]::Consoles())
+          $visible = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$app`"" -PassThru
+          if (-not $visible.WaitForExit(30000)) { throw 'La fenêtre PowerShell reste ouverte' }
+          Start-Sleep -Seconds 8
+          $left = @([TdCi.Win]::Consoles() | Where-Object { $before -notcontains $_ })
+          if ($left.Count -gt 0) { throw "Une fenêtre de console reste ouverte ($($left.Count))" }
+          $running = Get-TdProcess
+          if ($running.Count -eq 0) { throw 'TDfocus ne tourne pas après le passage au lanceur' }
+          Write-Host "Fenêtre PowerShell fermée, TDfocus relancé sans console : $($running[0].CommandLine)"
+          $running | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 
           .\Uninstall-TDfocus.ps1
           Start-Sleep -Seconds 4

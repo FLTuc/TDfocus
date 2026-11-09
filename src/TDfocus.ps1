@@ -32,6 +32,13 @@ if ($PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) {
     exit 1
 }
 
+# Lancé depuis une console visible : TDfocus.exe prend le relais sans fenêtre, et celle-ci se ferme.
+if (-not $SmokeTest) {
+    . (Join-Path $PSScriptRoot 'Storage.ps1')
+    foreach ($part in @('Platform\Windows', 'Platform\Launcher')) { . (Join-Path $PSScriptRoot "$part.ps1") }
+    if (Invoke-TdLauncherHandover -ScriptPath $PSCommandPath -Startup:$Startup) { return }
+}
+
 # WPF exige un thread STA : on se relance si besoin (PowerShell 5.1 et 7 sont STA par défaut).
 if ([System.Threading.Thread]::CurrentThread.ApartmentState -ne [System.Threading.ApartmentState]::STA) {
     $relaunch = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', ('"{0}"' -f $PSCommandPath))

@@ -36,6 +36,7 @@ internal static class TDfocusLauncher
             "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File \"" + script + "\" -HideConsole" + extra);
         info.UseShellExecute = false;
         info.CreateNoWindow = true;
+        info.EnvironmentVariables["TDFOCUS_HANDOVER"] = "1";
         info.WorkingDirectory = root;
         Process.Start(info);
         return 0;
@@ -90,5 +91,34 @@ function New-TdLauncher {
     }
     finally {
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-TdLauncherHandover {
+    # Lancé depuis une fenêtre de console (TDfocus.cmd, ancien raccourci ou ancienne clé de
+    # démarrage, Windows Terminal…) : on confie l'application à TDfocus.exe, qui démarre PowerShell
+    # sans aucune fenêtre, et ce processus s'arrête : sa fenêtre se ferme avec lui.
+    # Vrai si la main a été passée (l'appelant doit alors s'arrêter).
+    param([Parameter(Mandatory)][string]$ScriptPath, [switch]$Startup)
+    if ($env:TDFOCUS_HANDOVER) { return $false }   # déjà lancé par TDfocus.exe : pas de boucle
+    if (-not (Initialize-TdNative)) { return $false }
+    try { if ([TDfocus.Native]::GetConsoleWindow() -eq [IntPtr]::Zero) { return $false } }
+    catch { return $false }
+    $launcher = Get-TdLauncherPath -ScriptPath $ScriptPath
+    if (-not $launcher) {
+        $root = Split-Path -Parent (Split-Path -Parent $ScriptPath)
+        $launcher = New-TdLauncher -Destination $root -IconPath (Join-Path $root 'assets\TDfocus.ico')
+    }
+    if (-not $launcher) { return $false }
+    try {
+        $env:TDFOCUS_HANDOVER = '1'
+        if ($Startup) { Start-Process -FilePath $launcher -ArgumentList '-Startup' }
+        else { Start-Process -FilePath $launcher }
+        return $true
+    }
+    catch {
+        Write-TdLog "Passage au lanceur sans console impossible : $($_.Exception.Message)"
+        $env:TDFOCUS_HANDOVER = $null
+        return $false
     }
 }
