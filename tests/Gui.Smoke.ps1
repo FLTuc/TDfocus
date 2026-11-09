@@ -290,6 +290,74 @@ function Invoke-TdSmokeTest {
     Save-TdScreenshot '13-etroit'
     $w.Width = 1180
 
+    # Projets au long cours : petits pas, blocs de temps, note de reprise, 3 au plus en cours
+    Invoke-TdClick $ui.BtnTheme
+    Assert-Td (-not $script:Td.DarkActive) 'retour au thème clair'
+    Invoke-TdClick $ui.BtnProjects
+    Assert-Td ($script:Td.Drawer -eq 'projects') 'panneau Projets et quotidien'
+    $form = $script:Td.ProjectForm
+    $form.Name.Text = 'Rénover la cuisine'
+    $form.Why.Text = 'Cuisiner avec plaisir et inviter des amis'
+    $form.Steps.Text = "Mesurer les murs`nChoisir les couleurs`nAcheter la peinture`nPoncer les portes"
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Créer le projet' })
+    $project = $script:Td.Data.projects | Where-Object { $_.name -eq 'Rénover la cuisine' }
+    Assert-Td ($null -ne $project -and $project.status -eq 'active' -and @($project.steps).Count -eq 4) 'projet créé avec son pourquoi et ses pas'
+    $sixDaysAgo = (Get-TdNowMs) - 6 * 86400000
+    $thesis = New-TdProject -Name 'Écrire le mémoire' -Why 'Valider mon diplôme' -Steps @('Relire le plan', 'Rédiger l''introduction') -NowMs $sixDaysAgo
+    $thesis.lastWorkedAt = $sixDaysAgo
+    $thesis.investedMs = 200 * 60000
+    $thesis.sessions = 7
+    Set-TdProjectBreadcrumb -Project $thesis -Text 'Plan validé ; reprendre à la partie 2.' -NowMs $sixDaysAgo
+    [void](Add-TdProject -Projects $script:Td.Data.projects -Project $thesis)
+    Save-TdProjectsNow
+    Update-TdView
+    Update-TdDrawer
+    Assert-Td ($ui.ProjectNudge.Visibility -eq 'Visible' -and $ui.ProjectNudgeText.Text -like '*mémoire*attend depuis 6 jours*') "rappel doux du projet qui attend ($($ui.ProjectNudgeText.Text))"
+    Save-TdScreenshot '19-projets'
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Tag -eq $project.id -and "$($n.Content)" -like 'Bloc de*' })
+    $block = $state.tasks | Where-Object { $_.projectId -eq $project.id } | Select-Object -First 1
+    Assert-Td ($null -ne $block -and @($block.steps).Count -eq 3 -and $block.steps[0].title -eq 'Mesurer les murs') 'bloc projet ajouté avec ses 3 prochains pas seulement'
+    Assert-Td ($ui.ProjectNudge.Visibility -eq 'Collapsed') 'le rappel se tait quand un bloc projet est prévu'
+    Close-TdDrawer
+    Start-TdTaskNowById $block.id
+    Complete-TdStepNow
+    Assert-Td ($project.steps[0].done) 'le pas coché pendant le bloc est reporté sur le projet'
+    Assert-Td ($ui.CurrentCategoryText.Text -like '*Projet' -and $ui.ProjectHint.Text -like 'Pourquoi : Cuisiner*') 'la carte rappelle le projet et son pourquoi'
+    Save-TdScreenshot '20-bloc-projet'
+    Complete-TdCurrentNow
+    Assert-Td ($project.sessions -eq 1 -and $null -ne $project.lastWorkedAt) 'bloc terminé : avancement enregistré sur le projet'
+    Assert-Td ("$($ui.ToastAction.Content)" -like "Où j'en suis*") 'proposition de noter où l''on s''arrête'
+    Invoke-TdClick $ui.ToastAction
+    Assert-Td ($script:Td.Drawer -eq 'projects' -and $script:Td.ExpandedProjectId -eq $project.id) 'note de reprise ouverte'
+    $crumb = Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.TextBox] -and $n.Tag -eq $project.id -and $n.AcceptsReturn }
+    $crumb.Text = 'Murs mesurés. Prochaine fois : comparer trois nuanciers.'
+    $crumb.RaiseEvent((New-Object System.Windows.RoutedEventArgs ([System.Windows.UIElement]::LostFocusEvent)))
+    Assert-Td ($project.breadcrumb -like 'Murs mesurés*') 'note « où j''en étais » enregistrée'
+    foreach ($name in @('Apprendre la guitare', 'Trier les photos')) { [void](Add-TdProject -Projects $script:Td.Data.projects -Project (New-TdProject -Name $name)) }
+    Assert-Td (($script:Td.Data.projects | Where-Object { $_.name -eq 'Trier les photos' }).status -eq 'paused') 'au-delà de 3 projets en cours, le suivant attend'
+    Save-TdProjectsNow
+
+    # Quotidien : ajouté tout seul les jours prévus, sans accumulation
+    $script:Td.ProjectsTab = 'daily'
+    Update-TdDrawer
+    $script:Td.DailyBox.Text = 'Médicaments 2 @8h'
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Ajouter au quotidien' })
+    $meds = $script:Td.Data.daily | Where-Object { $_.title -eq 'Médicaments' }
+    Assert-Td ($null -ne $meds -and $meds.fixedStart -eq '08:00' -and $meds.minutes -eq 2) 'action du quotidien créée'
+    Assert-Td (@($state.tasks | Where-Object { $_.dailyId -eq $meds.id }).Count -eq 1) 'ajoutée dès aujourd''hui dans la journée'
+    $script:Td.DailyBox.Text = 'Vaisselle 10'
+    foreach ($tag in @('new|6', 'new|7')) { Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Primitives.ToggleButton] -and $n.Tag -eq $tag }) }
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Ajouter au quotidien' })
+    $dishes = $script:Td.Data.daily | Where-Object { $_.title -eq 'Vaisselle' }
+    Assert-Td ((@($dishes.days) -join ',') -eq '1,2,3,4,5') 'jours choisis : en semaine'
+    $script:Td.DailyBox.Text = 'Courrier 5'
+    Invoke-TdClick (Find-TdDescendant $ui.DrawerContent { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Ajouter au quotidien' })
+    Save-TdScreenshot '21-quotidien'
+    $reloaded = Import-TdData
+    Assert-Td ($reloaded.projects.Count -eq 4 -and $reloaded.daily.Count -eq 3) 'projets et quotidien relus depuis le disque'
+    Close-TdDrawer
+    Save-TdScreenshot '22-journee-avec-quotidien'
+
     # Sons calculés en arrière-plan (PowerShell pur)
     $deadline = (Get-Date).AddSeconds(240)
     while ($script:TdAudio.Jobs.Count -gt 0 -and (Get-Date) -lt $deadline) { Wait-TdUi 500 }

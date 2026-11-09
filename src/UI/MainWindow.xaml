@@ -296,6 +296,7 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
           <Button x:Name="BtnSounds" Style="{StaticResource IconButton}" Content="&#xE7F6;" ToolTip="Sons et carillons"/>
           <Button x:Name="BtnTemplates" Style="{StaticResource IconButton}" Content="&#xE8FD;" ToolTip="Routines"/>
+          <Button x:Name="BtnProjects" Style="{StaticResource IconButton}" Content="&#xE7C1;" ToolTip="Projets et quotidien (P)"/>
           <Button x:Name="BtnNotes" Style="{StaticResource IconButton}" Content="&#xE70B;" ToolTip="Bloc-notes (parking à idées)"/>
           <Button x:Name="BtnStats" Style="{StaticResource IconButton}" Content="&#xE9D9;" ToolTip="Statistiques : estimé vs réel"/>
           <Button x:Name="BtnImport" Style="{StaticResource IconButton}" Content="&#xE896;" ToolTip="Importer (Agenda, Todoist, Notion, texte)"/>
@@ -381,6 +382,7 @@
                     </Grid>
                   </Border>
                   <TextBlock x:Name="CurrentMeta" Text="" Style="{StaticResource Muted}" FontSize="13" Margin="0"/>
+                  <TextBlock x:Name="ProjectHint" Text="" Foreground="{DynamicResource MutedBrush}" FontSize="12" FontStyle="Italic" TextTrimming="CharacterEllipsis" Visibility="Collapsed" Margin="0,2,0,0" ToolTip="Note de reprise du projet"/>
                   <TextBlock x:Name="LandingHint" Text="" Foreground="{DynamicResource AccentBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
                   <TextBlock x:Name="OvertimeHint" Text="" Foreground="{DynamicResource OvertimeBrush}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
                   <TextBlock x:Name="NextLine" Text="" Style="{StaticResource Muted}" Visibility="Collapsed" Margin="0,2,0,0"/>
@@ -484,6 +486,14 @@
                 <TextBlock x:Name="ParkedText" Text="" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
                 <Button x:Name="BtnParkedRestore" Style="{StaticResource GhostButton}" Content="Ramener aujourd'hui" FontSize="12" HorizontalAlignment="Right"/>
               </Grid>
+              <!-- Rappel doux : le projet qui attend (une fois par jour, jamais insistant) -->
+              <Border x:Name="ProjectNudge" Visibility="Collapsed" CornerRadius="14" Padding="14,8,8,4" Margin="0,12,0,0" Background="{DynamicResource AccentSoftBrush}">
+                <WrapPanel>
+                  <TextBlock x:Name="ProjectNudgeText" Text="" Foreground="{DynamicResource TextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,4"/>
+                  <Button x:Name="BtnNudgeAdd" Style="{StaticResource PillButton}" Padding="12,4" Background="{DynamicResource SurfaceBrush}" Margin="0,0,4,4"/>
+                  <Button x:Name="BtnNudgeLater" Style="{StaticResource GhostButton}" Padding="8,4" Content="Pas aujourd'hui" Margin="0,0,0,4"/>
+                </WrapPanel>
+              </Border>
               <Button x:Name="BtnDoneToggle" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="-6,18,0,4" Padding="8,4">
                 <StackPanel Orientation="Horizontal">
                   <TextBlock x:Name="DoneChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>

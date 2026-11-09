@@ -55,6 +55,12 @@ function Initialize-TdApp {
         PendingRender     = $false
         PendingDrop       = $null
         ToastData         = $null
+        ProjectsTab       = 'projects'
+        ExpandedProjectId = $null
+        FocusProjectBox   = $null
+        ProjectForm       = $null
+        DailyBox          = $null
+        NewDailyDays      = @(1, 2, 3, 4, 5, 6, 7)
         Timer             = $null
         Stopped           = $false
     }
@@ -70,7 +76,9 @@ function Initialize-TdApp {
     $state = $script:Td.Data.state
     $paused = Repair-TdStaleTimer -State $state -NowMs $now
     [void](Invoke-TdDayRollover -State $state -NowMs $now)
+    $dailyAdded = Sync-TdDailyTasks -State $state -Daily $script:Td.Data.daily -NowMs $now
     Sync-TdState $state $now
+    if ($dailyAdded -gt 0) { Update-TdPlanBaseline -State $state -NowMs $now }
     $script:Td.Data.history = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdHistory -History $script:Td.Data.history -NowMs $now))
     $script:Td.Data.checkins = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdCheckIns -CheckIns $script:Td.Data.checkins -NowMs $now))
     Initialize-TdSignalMemory -State $state -Settings $script:Td.Data.settings -NowMs $now -Memory $script:Td.Signals
@@ -198,6 +206,11 @@ function Complete-TdCurrentNow {
     if (-not $done) { return }
     $script:Td.Data.history.Add((New-TdHistoryEntry $done))
     Save-TdHistoryNow
+    $project = $null
+    if ($done.projectId) {
+        $project = Complete-TdProjectBlock -Projects (Get-TdProjects) -Task $done -NowMs $now
+        if ($project) { Save-TdProjectsNow }
+    }
     if ($script:Td.EditingId -eq $done.id) { $script:Td.EditingId = $null }
     if ($isCurrent) { $script:Td.NoteOpen = $false }
     if ($settings.completionSound) { Invoke-TdSoundEffect -Name 'complete' -Volume $settings.effectsVolume }
@@ -208,6 +221,15 @@ function Complete-TdCurrentNow {
     }
     Complete-TdChange
     Invoke-TdConfetti -Origin $origin
+    if ($project) {
+        # Noter où l'on s'arrête tant que c'est frais : la reprise sera facile.
+        Show-TdToast -Text ('Bloc fait pour « {0} ». Bravo !' -f (Limit-TdText $project.name 34)) -ActionText "Où j'en suis…" -Seconds 10 -Data @{ Id = $project.id } -Action {
+            param($d)
+            Hide-TdToast
+            Show-TdBreadcrumbEditor -ProjectId $d.Id
+        }
+        return
+    }
     $message = '« {0} » terminée. Bravo !' -f (Limit-TdText $done.title 40)
     if ($state.tasks.Count -eq 0) { $message = 'Liste terminée. Bravo, tu peux souffler !' }
     Show-TdToast -Text $message -ActionText 'Annuler' -Data @{ Id = $done.id } -Action {
@@ -220,6 +242,7 @@ function Undo-TdCompleteNow {
     param([Parameter(Mandatory)][string]$Id)
     $restored = Undo-TdComplete -State (Get-TdState) -Id $Id -NowMs (Get-TdNowMs)
     if (-not $restored) { return }
+    if ($restored.projectId -and (Undo-TdProjectBlock -Projects (Get-TdProjects) -Task $restored)) { Save-TdProjectsNow }
     $history = $script:Td.Data.history
     for ($i = $history.Count - 1; $i -ge 0; $i--) { if ($history[$i].id -eq $Id) { $history.RemoveAt($i) } }
     Save-TdHistoryNow
@@ -374,6 +397,7 @@ function Complete-TdStepNow {
     if (-not $current) { return }
     $step = Complete-TdStep -State $state
     if (-not $step) { return }
+    if ($current.projectId -and (Sync-TdProjectFromTask -Projects (Get-TdProjects) -Task $current)) { Save-TdProjectsNow }
     $settings = Get-TdSettings
     if ($settings.completionSound) { Invoke-TdSoundEffect -Name 'complete' -Volume ($settings.effectsVolume * 0.5) }
     Save-TdStateNow
@@ -387,7 +411,10 @@ function Complete-TdStepNow {
 }
 
 function Undo-TdStepNow {
-    if (Undo-TdStep -State (Get-TdState)) {
+    $state = Get-TdState
+    if (Undo-TdStep -State $state) {
+        $current = Get-TdCurrentTask $state
+        if ($current.projectId -and (Sync-TdProjectFromTask -Projects (Get-TdProjects) -Task $current)) { Save-TdProjectsNow }
         Save-TdStateNow
         Update-TdView
     }
@@ -524,7 +551,7 @@ function Set-TdFocusMode {
         Close-TdDrawer
         $ui.AddBar.Visibility = $collapsed
         $ui.ListScroll.Visibility = $collapsed
-        foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $collapsed }
+        foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnProjects', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $collapsed }
         $ui.MainColumn.RowDefinitions[0].Height = New-Object System.Windows.GridLength 1, ([System.Windows.GridUnitType]::Star)
         $ui.MainColumn.RowDefinitions[2].Height = New-Object System.Windows.GridLength 0
         $ui.FocusCard.VerticalAlignment = 'Center'
@@ -536,7 +563,7 @@ function Set-TdFocusMode {
     else {
         $ui.AddBar.Visibility = $visible
         $ui.ListScroll.Visibility = $visible
-        foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $visible }
+        foreach ($name in @('BtnSounds', 'BtnTemplates', 'BtnProjects', 'BtnStats', 'BtnImport', 'BtnSettings', 'BtnTheme')) { $ui[$name].Visibility = $visible }
         $ui.MainColumn.RowDefinitions[0].Height = [System.Windows.GridLength]::Auto
         $ui.MainColumn.RowDefinitions[2].Height = New-Object System.Windows.GridLength 1, ([System.Windows.GridUnitType]::Star)
         $ui.FocusCard.VerticalAlignment = 'Stretch'
@@ -666,6 +693,20 @@ function Update-TdFocusCard {
     else {
         $ui.CurrentCategory.Visibility = 'Collapsed'
     }
+    $project = Find-TdProject (Get-TdProjects) $current.projectId
+    if (-not $category -and ($project -or $current.dailyId)) {
+        $ui.CurrentCategory.Visibility = 'Visible'
+        $ui.CurrentCategory.SetResourceReference([System.Windows.Controls.Border]::BackgroundProperty, 'SurfaceAltBrush')
+        if ($project) { $ui.CurrentCategoryText.Text = '{0}  Projet' -f $project.emoji }
+        else { $ui.CurrentCategoryText.Text = [string][char]0x21BB + '  Quotidien' }
+    }
+    # Reprise d'un projet : là où l'on s'était arrêté, sinon la raison de s'y mettre.
+    $hint = ''
+    if ($project -and $project.breadcrumb) { $hint = "Où j'en étais : " + $project.breadcrumb }
+    elseif ($project -and $project.why) { $hint = 'Pourquoi : ' + $project.why }
+    $ui.ProjectHint.Text = $hint
+    $ui.ProjectHint.ToolTip = $hint
+    if ($hint) { $ui.ProjectHint.Visibility = 'Visible' } else { $ui.ProjectHint.Visibility = 'Collapsed' }
 
     $running = $null -ne $current.runningSince
     $elapsed = Get-TdElapsedMs $current $NowMs
@@ -939,6 +980,9 @@ function Invoke-TdTick {
     # Changement de jour
     if ((Get-TdDayKey $now) -ne $state.dayKey) {
         [void](Invoke-TdDayRollover -State $state -NowMs $now)
+        [void](Sync-TdDailyTasks -State $state -Daily $script:Td.Data.daily -NowMs $now)
+        Sync-TdState $state $now
+        Update-TdPlanBaseline -State $state -NowMs $now
         Save-TdStateNow
         Update-TdView
         Show-TdMorningReviewIfNeeded
@@ -1109,6 +1153,9 @@ function Register-TdMainEvents {
 
     $ui.BtnSounds.Add_Click({ Show-TdDrawer 'sounds' })
     $ui.BtnTemplates.Add_Click({ Show-TdDrawer 'templates' })
+    $ui.BtnProjects.Add_Click({ Show-TdDrawer 'projects' })
+    $ui.BtnNudgeAdd.Add_Click({ if ($this.Tag) { Add-TdProjectBlockNow -Id ([string]$this.Tag) } })
+    $ui.BtnNudgeLater.Add_Click({ Set-TdNudgeOffToday })
     $ui.BtnNotes.Add_Click({ Show-TdDrawer 'notes' })
     $ui.BtnStats.Add_Click({ Show-TdDrawer 'stats' })
     $ui.BtnImport.Add_Click({ Show-TdDrawer 'import' })
@@ -1230,6 +1277,7 @@ function Invoke-TdShortcut {
         'M' { Set-TdCompactMode (-not $script:Td.Compact); $e.Handled = $true }
         'L' { Move-TdCurrentLater; $e.Handled = $true }
         'S' { Complete-TdStepNow; $e.Handled = $true }
+        'P' { Show-TdDrawer 'projects'; $e.Handled = $true }
         'N' { Show-TdAddBox; $e.Handled = $true }
     }
 }

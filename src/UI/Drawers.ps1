@@ -5,6 +5,7 @@ $script:TdDrawerTitles = @{
     review    = 'Revue du matin'
     sounds    = 'Sons et carillons'
     templates = 'Routines'
+    projects  = 'Projets et quotidien'
     notes     = 'Bloc-notes'
     stats     = 'Estimé vs réel'
     import    = 'Importer la journée'
@@ -49,6 +50,7 @@ function Update-TdDrawer {
         'review' { Build-TdReviewPanel $panel }
         'sounds' { Build-TdSoundsPanel $panel }
         'templates' { Build-TdTemplatesPanel $panel }
+        'projects' { Build-TdProjectsPanel $panel }
         'notes' { Build-TdNotesPanel $panel }
         'stats' { Build-TdStatsPanel $panel }
         'import' { Build-TdImportPanel $panel }
@@ -871,6 +873,7 @@ function Build-TdSettingsPanel {
     foreach ($line in @(
             'Espace : démarrer / pause',
             'S : étape faite',
+            'P : projets et quotidien',
             'Ctrl + Entrée : valider la tâche en cours',
             '+ / − : ajouter / retirer 1 minute',
             'L : reporter la tâche en fin de liste',
@@ -975,6 +978,9 @@ function Import-TdBackupNow {
         Save-TdHistoryNow
         Save-TdTemplates $restored.templates
         Save-TdNotes $restored.notes
+        Save-TdCheckIns $restored.checkins
+        Save-TdProjects $restored.projects
+        Save-TdDaily $restored.daily
         Update-TdThemeNow
         Build-TdAddBarChips
         Set-TdAmbient -Name $restored.settings.ambient -Volume $restored.settings.ambientVolume

@@ -156,6 +156,15 @@ function Update-TdUpNext {
         $ui.ParkedText.Text = $(if ($parked -gt 1) { "$parked tâches reportées à demain" } else { '1 tâche reportée à demain' })
     }
     else { $ui.ParkedBar.Visibility = 'Collapsed' }
+    $nudge = $null
+    if (-not $script:Td.FocusMode) { $nudge = Get-TdProjectNudge -Projects (Get-TdProjects) -State $state -NowMs $NowMs }
+    if ($nudge) {
+        $ui.ProjectNudge.Visibility = 'Visible'
+        $ui.ProjectNudgeText.Text = '{0}  {1}' -f $nudge.project.emoji, (Get-TdNudgeText $nudge)
+        $ui.BtnNudgeAdd.Content = '+ {0} aujourd''hui' -f (Format-TdMinutes $nudge.project.blockMinutes)
+        $ui.BtnNudgeAdd.Tag = $nudge.project.id
+    }
+    else { $ui.ProjectNudge.Visibility = 'Collapsed' }
     $script:Td.StructureKey = Get-TdStructureKey $Schedule
 }
 
@@ -195,10 +204,18 @@ function New-TdTaskRow {
         $r.CatEmoji.Text = [string][char]0x2022
         $r.CatEmoji.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MutedBrush')
     }
+    $project = Find-TdProject (Get-TdProjects) $Task.projectId
+    if ($project -and -not $category) {
+        $r.CatEmoji.Text = $project.emoji
+        $r.CatEmoji.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'TextBrush')
+        $r.CatChip.ToolTip = 'Bloc du projet « {0} »' -f $project.name
+    }
     $r.DurationButton.Content = Format-TdDurationMs $Task.plannedMs
     $r.EndTime.Text = Format-TdClock $Item.endMs
 
     $subParts = @()
+    if ($project) { $subParts += 'bloc projet' }
+    elseif ($Task.dailyId) { $subParts += [string][char]0x21BB + ' quotidien' }
     if ($Task.fixedStart) {
         if ($Item.lateMs -gt 0) {
             $subParts += 'Créneau {0} · décalé de {1}' -f $Task.fixedStart, (Format-TdDurationMs $Item.lateMs)

@@ -116,7 +116,15 @@ function Import-TdData {
     foreach ($c in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'checkins.json')) 'items')) {
         if ($null -ne $c) { $checkins.Add((ConvertTo-TdCheckIn $c)) }
     }
-    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes; checkins = $checkins }
+    $projects = [System.Collections.Generic.List[object]]::new()
+    foreach ($p in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'projects.json')) 'items')) {
+        if ($null -ne $p) { $projects.Add((ConvertTo-TdProject $p)) }
+    }
+    $daily = [System.Collections.Generic.List[object]]::new()
+    foreach ($d in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'daily.json')) 'items')) {
+        if ($null -ne $d) { $daily.Add((ConvertTo-TdDailyAction $d)) }
+    }
+    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes; checkins = $checkins; projects = $projects; daily = $daily }
 }
 
 function ConvertTo-TdStateRecord {
@@ -131,6 +139,9 @@ function ConvertTo-TdStateRecord {
         planEndMs  = $State.planEndMs
         lastSeenMs = $State.lastSeenMs
         dayKey     = $State.dayKey
+        dailyKey   = $State.dailyKey
+        dailyMade  = @($State.dailyMade)
+        nudgeOff   = $State.nudgeOff
     }
 }
 
@@ -164,6 +175,16 @@ function Save-TdCheckIns {
     Write-TdJsonFile (Get-TdDataPath 'checkins.json') ([ordered]@{ version = 1; items = @($CheckIns) })
 }
 
+function Save-TdProjects {
+    param([AllowEmptyCollection()]$Projects)
+    Write-TdJsonFile (Get-TdDataPath 'projects.json') ([ordered]@{ version = 1; items = @($Projects) })
+}
+
+function Save-TdDaily {
+    param([AllowEmptyCollection()]$Daily)
+    Write-TdJsonFile (Get-TdDataPath 'daily.json') ([ordered]@{ version = 1; items = @($Daily) })
+}
+
 function Export-TdBackup {
     # Sauvegarde complète dans un seul fichier JSON.
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)]$Data)
@@ -180,6 +201,8 @@ function Export-TdBackup {
             templates = @($Data.templates)
             notes     = @($Data.notes)
             checkins  = @($Data.checkins)
+            projects  = @($Data.projects)
+            daily     = @($Data.daily)
         })
 }
 
@@ -195,6 +218,10 @@ function Import-TdBackup {
     foreach ($n in @(Get-TdValue $raw 'notes')) { if ($null -ne $n) { $notes.Add((ConvertTo-TdNote $n)) } }
     $checkins = [System.Collections.Generic.List[object]]::new()
     foreach ($c in @(Get-TdValue $raw 'checkins')) { if ($null -ne $c) { $checkins.Add((ConvertTo-TdCheckIn $c)) } }
+    $projects = [System.Collections.Generic.List[object]]::new()
+    foreach ($p in @(Get-TdValue $raw 'projects')) { if ($null -ne $p) { $projects.Add((ConvertTo-TdProject $p)) } }
+    $daily = [System.Collections.Generic.List[object]]::new()
+    foreach ($d in @(Get-TdValue $raw 'daily')) { if ($null -ne $d) { $daily.Add((ConvertTo-TdDailyAction $d)) } }
     @{
         state     = ConvertTo-TdState (Get-TdValue $raw 'state')
         settings  = ConvertTo-TdSettings (Get-TdValue $raw 'settings')
@@ -202,5 +229,7 @@ function Import-TdBackup {
         templates = $templates
         notes     = $notes
         checkins  = $checkins
+        projects  = $projects
+        daily     = $daily
     }
 }

@@ -8,7 +8,7 @@
 $script:TdTaskFields = @(
     'id', 'title', 'plannedMs', 'estimateMs', 'categoryId', 'elapsedMs', 'runningSince',
     'startedAt', 'completedAt', 'fixedStart', 'note', 'source', 'externalId', 'createdAt',
-    'steps', 'pausedAt', 'deferUntil'
+    'steps', 'pausedAt', 'deferUntil', 'projectId', 'dailyId'
 )
 
 function New-TdId {
@@ -98,6 +98,8 @@ function ConvertTo-TdTask {
         steps        = ConvertTo-TdSteps (Get-TdValue $InputObject 'steps')
         pausedAt     = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'pausedAt')
         deferUntil   = ConvertTo-TdNullableString (Get-TdValue $InputObject 'deferUntil')
+        projectId    = ConvertTo-TdNullableString (Get-TdValue $InputObject 'projectId')   # bloc d'un projet
+        dailyId      = ConvertTo-TdNullableString (Get-TdValue $InputObject 'dailyId')     # action du quotidien
     }
 }
 
@@ -139,6 +141,9 @@ function New-TdState {
         dayKey     = $null
         parked     = [System.Collections.Generic.List[object]]::new()   # reportées à un autre jour
         review     = [System.Collections.Generic.List[string]]::new()   # revue du matin en attente
+        dailyKey   = $null                                              # jour des actions du quotidien ajoutées
+        dailyMade  = [System.Collections.Generic.List[string]]::new()   # actions du quotidien déjà ajoutées ce jour-là
+        nudgeOff   = $null                                              # jour où le rappel de projet a été écarté
     }
 }
 
@@ -170,6 +175,11 @@ function ConvertTo-TdState {
     $lastSeen = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'lastSeenMs')
     if ($null -ne $lastSeen) { $state.lastSeenMs = $lastSeen }
     $state.dayKey = ConvertTo-TdNullableString (Get-TdValue $InputObject 'dayKey')
+    $state.dailyKey = ConvertTo-TdNullableString (Get-TdValue $InputObject 'dailyKey')
+    foreach ($id in @(Get-TdValue $InputObject 'dailyMade')) {
+        if ($id) { $state.dailyMade.Add([string]$id) }
+    }
+    $state.nudgeOff = ConvertTo-TdNullableString (Get-TdValue $InputObject 'nudgeOff')
     $state
 }
 
@@ -577,12 +587,22 @@ function Invoke-TdDayRollover {
         else { $i++ }
     }
     $newDay = $State.dayKey -and $State.dayKey -ne $today
+    $dailyCleared = 0
     if ($newDay) {
+        # Actions du quotidien d'hier non faites : elles ne s'accumulent pas, elles reviendront
+        # d'elles-mêmes le prochain jour prévu (sauf celle déjà commencée en ce moment).
+        for ($i = $State.tasks.Count - 1; $i -ge 0; $i--) {
+            $task = $State.tasks[$i]
+            if (-not $task.dailyId) { continue }
+            if ($i -eq 0 -and ($null -ne $task.runningSince -or [long]$task.elapsedMs -gt 0)) { continue }
+            $State.tasks.RemoveAt($i)
+            $dailyCleared++
+        }
         $State.review.Clear()
-        foreach ($task in $State.tasks) { $State.review.Add([string]$task.id) }
+        foreach ($task in $State.tasks) { if (-not $task.dailyId) { $State.review.Add([string]$task.id) } }
     }
     $State.dayKey = $today
-    [pscustomobject]@{ removed = $removed; returned = $returned; newDay = [bool]$newDay; review = $State.review.Count }
+    [pscustomobject]@{ removed = $removed; returned = $returned; newDay = [bool]$newDay; review = $State.review.Count; dailyCleared = $dailyCleared }
 }
 
 function Repair-TdStaleTimer {
