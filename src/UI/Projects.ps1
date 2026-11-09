@@ -230,6 +230,8 @@ function Add-TdProjectDetails {
     }
     [void]$actions.Children.Add((New-TdButton -Content 'Supprimer' -Style 'GhostButton' -Margin '0,0,0,4' -Tag $id -OnClick { Remove-TdProjectNow -Id ([string]$this.Tag) }))
     [void]$details.Children.Add($actions)
+    # Les champs ont le fond des cartes : on les éclaircit pour qu'ils restent visibles.
+    foreach ($box in @($stepBox, $crumb, $due)) { $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush') }
     [void]$Panel.Children.Add($details)
 
     $focus = $script:Td.FocusProjectBox

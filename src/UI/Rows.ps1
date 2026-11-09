@@ -178,6 +178,7 @@ function Update-TdRowTimes {
         if ($ref.EndTime.Text -ne $text) { $ref.EndTime.Text = $text }
         if ($item.lateMs -gt 0) {
             $late = 'Créneau {0} · décalé de {1}' -f $ref.Fixed, (Format-TdDurationMs $item.lateMs)
+            if ($ref.Badge) { $late = $ref.Badge + ' · ' + $late }
             if ($ref.Sub.Text -ne $late) { $ref.Sub.Text = $late }
         }
     }
@@ -214,8 +215,10 @@ function New-TdTaskRow {
     $r.EndTime.Text = Format-TdClock $Item.endMs
 
     $subParts = @()
-    if ($project) { $subParts += 'bloc projet' }
-    elseif ($Task.dailyId) { $subParts += [string][char]0x21BB + ' quotidien' }
+    $badge = ''
+    if ($project) { $badge = 'bloc projet' }
+    elseif ($Task.dailyId) { $badge = [string][char]0x21BB + ' quotidien' }
+    if ($badge) { $subParts += $badge }
     if ($Task.fixedStart) {
         if ($Item.lateMs -gt 0) {
             $subParts += 'Créneau {0} · décalé de {1}' -f $Task.fixedStart, (Format-TdDurationMs $Item.lateMs)
@@ -233,7 +236,7 @@ function New-TdTaskRow {
         $r.Sub.Text = $subParts -join ' · '
         $r.Sub.Visibility = 'Visible'
     }
-    $script:Td.RowRefs[$id] = @{ EndTime = $r.EndTime; Sub = $r.Sub; Fixed = $Task.fixedStart }
+    $script:Td.RowRefs[$id] = @{ EndTime = $r.EndTime; Sub = $r.Sub; Fixed = $Task.fixedStart; Badge = $badge }
 
     $r.BtnStart.Add_Click({ Start-TdTaskNowById ([string]$this.Tag) })
     $r.BtnComplete.Add_Click({ Complete-TdCurrentNow -Id ([string]$this.Tag) })
