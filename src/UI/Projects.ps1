@@ -3,15 +3,12 @@
 #     avec le « pourquoi » et une note « où j'en étais » pour reprendre sans effort.
 #   - Quotidien : actions récurrentes ajoutées toutes seules les jours prévus, sans dette.
 
-function Get-TdProjects { $script:Td.Data.projects }
-function Get-TdDaily { $script:Td.Data.daily }
-
 function Save-TdProjectsNow {
-    try { Save-TdProjects (Get-TdProjects) } catch { Write-TdLog "Sauvegarde des projets impossible : $($_.Exception.Message)" }
+    try { Save-TdProjects $script:Td.Data.projects } catch { Write-TdLog "Sauvegarde des projets impossible : $($_.Exception.Message)" }
 }
 
 function Save-TdDailyNow {
-    try { Save-TdDaily (Get-TdDaily) } catch { Write-TdLog "Sauvegarde du quotidien impossible : $($_.Exception.Message)" }
+    try { Save-TdDaily $script:Td.Data.daily } catch { Write-TdLog "Sauvegarde du quotidien impossible : $($_.Exception.Message)" }
 }
 
 function Build-TdProjectsPanel {
@@ -33,7 +30,7 @@ function Build-TdProjectsPanel {
 
 function Build-TdProjectSection {
     param($Panel)
-    $projects = Get-TdProjects
+    $projects = $script:Td.Data.projects
     $state = Get-TdState
     $now = Get-TdNowMs
     $active = @(Get-TdActiveProjects $projects)
@@ -148,7 +145,7 @@ function Add-TdProjectDetails {
         $row.Margin = New-Object System.Windows.Thickness 0, 0, 0, 2
         $del = New-TdButton -Content ([string][char]0xE74D) -Style 'SmallIconButton' -ToolTip 'Retirer ce pas' -Tag "$id|$($step.id)" -OnClick {
             $p = ([string]$this.Tag).Split('|')
-            $project = Find-TdProject (Get-TdProjects) $p[0]
+            $project = Find-TdProject $script:Td.Data.projects $p[0]
             if ($project) { Remove-TdProjectStep -Project $project -StepId $p[1]; Save-TdProjectsNow; Update-TdDrawer }
         }
         [System.Windows.Controls.DockPanel]::SetDock($del, [System.Windows.Controls.Dock]::Right)
@@ -160,7 +157,7 @@ function Add-TdProjectDetails {
         $check.Tag = "$id|$($step.id)"
         $check.Add_Click({
                 $p = ([string]$this.Tag).Split('|')
-                $project = Find-TdProject (Get-TdProjects) $p[0]
+                $project = Find-TdProject $script:Td.Data.projects $p[0]
                 if (-not $project) { return }
                 [void](Set-TdProjectStepDone -Project $project -StepId $p[1] -Done ([bool]$this.IsChecked))
                 Save-TdProjectsNow
@@ -176,7 +173,7 @@ function Add-TdProjectDetails {
             param($s, $e)
             if ($e.Key -ne 'Return') { return }
             $e.Handled = $true
-            $project = Find-TdProject (Get-TdProjects) ([string]$s.Tag)
+            $project = Find-TdProject $script:Td.Data.projects ([string]$s.Tag)
             if (-not $project -or [string]::IsNullOrWhiteSpace($s.Text)) { return }
             [void](Add-TdProjectStep -Project $project -Title $s.Text)
             Save-TdProjectsNow
@@ -191,7 +188,7 @@ function Add-TdProjectDetails {
     $crumb.ToolTip = 'Où tu t''es arrêté·e et ce que tu comptais faire ensuite : ta mémoire de travail, gardée pour toi.'
     $crumb.Add_LostFocus({
             param($s, $e)
-            $project = Find-TdProject (Get-TdProjects) ([string]$s.Tag)
+            $project = Find-TdProject $script:Td.Data.projects ([string]$s.Tag)
             if (-not $project -or $project.breadcrumb -eq $s.Text.Trim()) { return }
             Set-TdProjectBreadcrumb -Project $project -Text $s.Text
             Save-TdProjectsNow
@@ -213,7 +210,7 @@ function Add-TdProjectDetails {
     foreach ($m in @(15, 25, 45, 60)) {
         $chip = New-TdChip -Content "$m min" -Group "Block$id" -Checked ([int]$Project.blockMinutes -eq $m) -Tag "$id|$m" -OnClick {
             $p = ([string]$this.Tag).Split('|')
-            $project = Find-TdProject (Get-TdProjects) $p[0]
+            $project = Find-TdProject $script:Td.Data.projects $p[0]
             if ($project) { $project.blockMinutes = [int]$p[1]; Save-TdProjectsNow; Update-TdDrawer; Update-TdView }
         }
         $chip.Margin = New-Object System.Windows.Thickness 0, 0, 4, 4
@@ -243,7 +240,7 @@ function Add-TdProjectDetails {
 
 function Set-TdProjectDeadlineFromBox {
     param([Parameter(Mandatory)]$Box)
-    $project = Find-TdProject (Get-TdProjects) ([string]$Box.Tag)
+    $project = Find-TdProject $script:Td.Data.projects ([string]$Box.Tag)
     if (-not $project) { return }
     $text = $Box.Text.Trim()
     $key = $null
@@ -271,7 +268,7 @@ function New-TdProjectFromForm {
     }
     $steps = @(ConvertFrom-TdStepsText $form.Steps.Text | ForEach-Object { $_.title })
     $project = New-TdProject -Name $name -Why $form.Why.Text -Deadline $deadline -Steps $steps -NowMs $now
-    $status = Add-TdProject -Projects (Get-TdProjects) -Project $project
+    $status = Add-TdProject -Projects $script:Td.Data.projects -Project $project
     Save-TdProjectsNow
     $script:Td.ExpandedProjectId = $project.id
     if ($status -eq 'paused') {
@@ -288,7 +285,7 @@ function New-TdProjectFromForm {
 
 function Add-TdProjectBlockNow {
     param([Parameter(Mandatory)][string]$Id)
-    $project = Find-TdProject (Get-TdProjects) $Id
+    $project = Find-TdProject $script:Td.Data.projects $Id
     if (-not $project) { return }
     $now = Get-TdNowMs
     $task = New-TdProjectBlockTask -Project $project -NowMs $now
@@ -306,7 +303,7 @@ function Add-TdProjectBlockNow {
 
 function Set-TdProjectStatusNow {
     param([Parameter(Mandatory)][string]$Id, [Parameter(Mandatory)][string]$Status)
-    $projects = Get-TdProjects
+    $projects = $script:Td.Data.projects
     $project = Find-TdProject $projects $Id
     if (-not $project) { return }
     if (-not (Set-TdProjectStatus -Projects $projects -Project $project -Status $Status -NowMs (Get-TdNowMs))) {
@@ -327,7 +324,7 @@ function Set-TdProjectStatusNow {
 
 function Remove-TdProjectNow {
     param([Parameter(Mandatory)][string]$Id)
-    $projects = Get-TdProjects
+    $projects = $script:Td.Data.projects
     for ($i = 0; $i -lt $projects.Count; $i++) {
         if ($projects[$i].id -ne $Id) { continue }
         $project = $projects[$i]
@@ -337,7 +334,7 @@ function Remove-TdProjectNow {
         Update-TdView
         Show-TdToast -Text ('Projet « {0} » supprimé.' -f (Limit-TdText $project.name 30)) -ActionText 'Annuler' -Data @{ Project = $project; Index = $i } -Action {
             param($d)
-            $list = Get-TdProjects
+            $list = $script:Td.Data.projects
             $list.Insert([Math]::Min($d.Index, $list.Count), $d.Project)
             Save-TdProjectsNow
             Hide-TdToast
@@ -368,7 +365,7 @@ function Set-TdNudgeOffToday {
 function Build-TdDailySection {
     param($Panel)
     Add-TdSection $Panel 'Chaque jour, tout seul' 'Ces actions s''ajoutent d''elles-mêmes à ta journée les jours prévus, sans rien décider. Pas faites ? Elles ne s''accumulent pas : elles reviennent simplement le prochain jour prévu.'
-    $daily = @(Get-TdDaily)
+    $daily = @($script:Td.Data.daily)
     if ($daily.Count -eq 0) {
         [void]$Panel.Children.Add((New-TdText -Text 'Aucune action pour l''instant. Pense aux petites choses qui reviennent : médicaments, vaisselle, courrier, arroser les plantes…' -Size 13 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,10'))
     }
@@ -406,9 +403,9 @@ function New-TdDailyCard {
     $del = New-TdButton -Content ([string][char]0xE74D) -Style 'SmallIconButton' -ToolTip 'Retirer du quotidien' -Tag $Action.id -OnClick { Remove-TdDailyNow -Id ([string]$this.Tag) }
     [System.Windows.Controls.DockPanel]::SetDock($del, [System.Windows.Controls.Dock]::Right)
     [void]$row.Children.Add($del)
-    $switch = New-TdSwitch -Label $Action.title -Checked ([bool]$Action.active) -ToolTip 'Active : ajoutée toute seule les jours prévus. Désactivée : mise de côté.' -OnChange { Set-TdDailyActiveNow -Id ([string]$this.Tag) -Active ([bool]$this.IsChecked) }
-    $switch.Tag = $Action.id
-    [void]$row.Children.Add($switch)
+    $toggle = New-TdSwitch -Label $Action.title -Checked ([bool]$Action.active) -ToolTip 'Active : ajoutée toute seule les jours prévus. Désactivée : mise de côté.' -OnChange { Set-TdDailyActiveNow -Id ([string]$this.Tag) -Active ([bool]$this.IsChecked) }
+    $toggle.Tag = $Action.id
+    [void]$row.Children.Add($toggle)
     [void]$stack.Children.Add($row)
     $meta = @((Format-TdMinutes $Action.minutes), (Format-TdDays $Action.days))
     if ($Action.fixedStart) { $meta += 'à ' + $Action.fixedStart }
@@ -420,13 +417,13 @@ function New-TdDailyCard {
 
 function Find-TdDailyAction {
     param([string]$Id)
-    foreach ($a in @(Get-TdDaily)) { if ($a.id -eq $Id) { return $a } }
+    foreach ($a in @($script:Td.Data.daily)) { if ($a.id -eq $Id) { return $a } }
     $null
 }
 
 function Update-TdDailyToday {
     # Ajoute aujourd'hui ce qui est prévu et pas encore fait (après un ajout ou une réactivation).
-    $added = Sync-TdDailyTasks -State (Get-TdState) -Daily (Get-TdDaily) -NowMs (Get-TdNowMs)
+    $added = Sync-TdDailyTasks -State (Get-TdState) -Daily $script:Td.Data.daily -NowMs (Get-TdNowMs)
     if ($added -gt 0) { Complete-TdChange -Replan }
     $added
 }
@@ -442,7 +439,7 @@ function Add-TdDailyNow {
     $days = @($script:Td.NewDailyDays)
     if ($days.Count -eq 0) { $days = @(1, 2, 3, 4, 5, 6, 7) }
     $action = New-TdDailyAction -Title $parsed.title -Minutes ([double]$minutes) -Days $days -FixedStart $parsed.fixedStart
-    (Get-TdDaily).Add($action)
+    $script:Td.Data.daily.Add($action)
     Save-TdDailyNow
     $added = Update-TdDailyToday
     $script:Td.NewDailyDays = @(1, 2, 3, 4, 5, 6, 7)
@@ -488,7 +485,7 @@ function Set-TdDailyActiveNow {
 
 function Remove-TdDailyNow {
     param([Parameter(Mandatory)][string]$Id)
-    $daily = Get-TdDaily
+    $daily = $script:Td.Data.daily
     for ($i = 0; $i -lt $daily.Count; $i++) {
         if ($daily[$i].id -ne $Id) { continue }
         $action = $daily[$i]
@@ -497,7 +494,7 @@ function Remove-TdDailyNow {
         Update-TdDrawer
         Show-TdToast -Text ('« {0} » retirée du quotidien.' -f (Limit-TdText $action.title 30)) -ActionText 'Annuler' -Data @{ Action = $action; Index = $i } -Action {
             param($d)
-            $list = Get-TdDaily
+            $list = $script:Td.Data.daily
             $list.Insert([Math]::Min($d.Index, $list.Count), $d.Action)
             Save-TdDailyNow
             Hide-TdToast

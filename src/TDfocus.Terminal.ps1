@@ -31,7 +31,7 @@ $script:TdVersion = '1.0.0'
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'TDfocus.Core.ps1')
-foreach ($part in @('Audio/Synth', 'Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App')) {
+foreach ($part in @('Audio/Synth', 'Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects')) {
     . (Join-Path $PSScriptRoot "$part.ps1")
 }
 
@@ -40,7 +40,7 @@ if ($SmokeTest) {
     $script:TdTuiNoColor = $true
     Initialize-TdTui -ScriptPath $PSCommandPath
     $now = Get-TdNowMs
-    foreach ($mode in @('main', 'help', 'routines', 'stats', 'notes', 'settings', 'review')) {
+    foreach ($mode in @('main', 'help', 'routines', 'stats', 'notes', 'settings', 'review', 'projects', 'daily')) {
         $script:Tui.Mode = $mode
         "===== $mode"
         Get-TdTuiFrame -NowMs $now -Width $Width -Height $Height

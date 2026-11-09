@@ -598,6 +598,8 @@ function Invoke-TdDayRollover {
             $State.tasks.RemoveAt($i)
             $dailyCleared++
         }
+        $State.dailyKey = $null
+        $State.dailyMade.Clear()
         $State.review.Clear()
         foreach ($task in $State.tasks) { if (-not $task.dailyId) { $State.review.Add([string]$task.id) } }
     }

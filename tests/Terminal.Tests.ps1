@@ -6,7 +6,7 @@ param()
 BeforeAll {
     $script:SrcDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'src'
     . (Join-Path $script:SrcDir 'TDfocus.Core.ps1')
-    foreach ($part in @('Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App')) {
+    foreach ($part in @('Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects')) {
         . (Join-Path $script:SrcDir "$part.ps1")
     }
     $script:SavedData = $env:TDFOCUS_DATA
@@ -19,7 +19,7 @@ BeforeAll {
             Space = @([char]' ', [ConsoleKey]::Spacebar); Backspace = @([char]8, [ConsoleKey]::Backspace)
             Up = @([char]0, [ConsoleKey]::UpArrow); Down = @([char]0, [ConsoleKey]::DownArrow)
             Left = @([char]0, [ConsoleKey]::LeftArrow); Right = @([char]0, [ConsoleKey]::RightArrow)
-            Delete = @([char]0, [ConsoleKey]::Delete)
+            Delete = @([char]0, [ConsoleKey]::Delete); Tab = @([char]9, [ConsoleKey]::Tab)
         }
         if ($Name -eq 'CtrlC') { return [System.ConsoleKeyInfo]::new([char]3, [ConsoleKey]::C, $false, $false, $true) }
         if ($special.ContainsKey($Name)) { return [System.ConsoleKeyInfo]::new($special[$Name][0], $special[$Name][1], $false, $false, $false) }
@@ -101,7 +101,7 @@ Describe 'Écrans' {
         $tui.Message = $null
     }
     It 'l''écran <Mode> fait exactement <Height> lignes de <Width> colonnes au plus' -ForEach @(
-        foreach ($mode in @('main', 'help', 'routines', 'stats', 'notes', 'settings', 'review')) {
+        foreach ($mode in @('main', 'help', 'routines', 'stats', 'notes', 'settings', 'review', 'projects', 'daily')) {
             foreach ($size in @(@(40, 12), @(80, 24), @(132, 43))) { @{ Mode = $mode; Width = $size[0]; Height = $size[1] } }
         }
     ) {
@@ -347,6 +347,136 @@ Describe 'Minuteur : signaux, points de contrôle, revue du matin' {
         $tui.Data.state.dayKey = '2000-01-01'
         Invoke-TdTuiTick -NowMs (Get-TdNowMs)
         $tui.Mode | Should -Be 'main'
+        $tui.Data.state.review.Count | Should -Be 0
+    }
+}
+
+Describe 'Projets et quotidien (terminal)' {
+    BeforeEach { $tui = Initialize-TestTui }
+
+    It 'crée un projet (nom ; pourquoi ; échéance) puis enchaîne sur son premier pas' {
+        Send-TestKey 'P'
+        $tui.Mode | Should -Be 'projects'
+        Send-TestKey 'a'
+        Send-TestText 'Cuisine ; recevoir mes amis ; 15/12/2030'
+        Send-TestKey 'Enter'
+        $project = $tui.Data.projects[0]
+        $project.name | Should -Be 'Cuisine'
+        $project.why | Should -Be 'recevoir mes amis'
+        $project.deadline | Should -Be '2030-12-15'
+        $tui.Prompt.Label | Should -Be 'Premier pas'
+        Send-TestText 'Mesurer les murs'
+        Send-TestKey 'Enter'
+        $project.steps[0].title | Should -Be 'Mesurer les murs'
+        (Read-TdJsonFile (Get-TdDataPath 'projects.json')).items[0].name | Should -Be 'Cuisine'
+        Get-TestScreen | Should -Match 'Prochain pas : Mesurer les murs'
+    }
+    It 'ajoute un bloc du projet à la journée, une seule fois' {
+        $project = New-TdProject -Name 'Mémoire' -Steps @('Relire le plan', 'Intro', 'Partie 1', 'Partie 2')
+        [void](Add-TdProject -Projects $tui.Data.projects -Project $project)
+        Send-TestKey 'P', 'Enter'
+        $block = $tui.Data.state.tasks | Where-Object { $_.projectId -eq $project.id }
+        $block.steps.Count | Should -Be 3
+        Send-TestKey 'Enter'
+        @($tui.Data.state.tasks | Where-Object { $_.projectId -eq $project.id }).Count | Should -Be 1
+        $tui.Message.Text | Should -Match 'déjà dans ta journée'
+    }
+    It 'coche, annule et note où l''on en est' {
+        $project = New-TdProject -Name 'Mémoire' -Steps @('Relire le plan', 'Intro')
+        [void](Add-TdProject -Projects $tui.Data.projects -Project $project)
+        Send-TestKey 'P', 'f'
+        $project.steps[0].done | Should -BeTrue
+        Send-TestKey 'z'
+        $project.steps[0].done | Should -BeFalse
+        Send-TestKey 'j'
+        Send-TestText 'Plan relu, reprendre à l''intro'
+        Send-TestKey 'Enter'
+        $project.breadcrumb | Should -Be 'Plan relu, reprendre à l''intro'
+        Send-TestKey 's'
+        Send-TestText 'Partie 1'
+        Send-TestKey 'Enter'
+        $project.steps.Count | Should -Be 3
+    }
+    It 'garde au plus 3 projets en cours, met en attente, termine et supprime' {
+        foreach ($n in 'A', 'B', 'C', 'D') { [void](Add-TdProject -Projects $tui.Data.projects -Project (New-TdProject -Name $n)) }
+        ($tui.Data.projects | Where-Object { $_.name -eq 'D' }).status | Should -Be 'paused'
+        Send-TestKey 'P', 'Down', 'Down', 'Down', 'p'
+        ($tui.Data.projects | Where-Object { $_.name -eq 'D' }).status | Should -Be 'paused'
+        $tui.Message.Text | Should -Match 'déjà beaucoup'
+        Send-TestKey 'Up', 'Up', 'Up', 'p'
+        ($tui.Data.projects | Where-Object { $_.name -eq 'A' }).status | Should -Be 'paused'
+        $tui.ListSel = [Array]::IndexOf(@(Get-TdTuiProjectList), ($tui.Data.projects | Where-Object { $_.name -eq 'D' }))
+        Send-TestKey 'p'
+        ($tui.Data.projects | Where-Object { $_.name -eq 'D' }).status | Should -Be 'active'
+        Send-TestKey 't'
+        ($tui.Data.projects | Where-Object { $_.name -eq 'D' }).status | Should -Be 'done'
+        $tui.ListSel = 0
+        Send-TestKey 'x'
+        $tui.Data.projects.Count | Should -Be 3
+        Send-TestKey 'z'
+        $tui.Data.projects.Count | Should -Be 4
+    }
+    It 'reporte sur le projet le bloc terminé et propose la note de reprise' {
+        $project = New-TdProject -Name 'Mémoire' -Why 'Valider mon diplôme' -Steps @('Relire le plan', 'Intro')
+        [void](Add-TdProject -Projects $tui.Data.projects -Project $project)
+        Send-TestKey 'P', 'Enter', 'Escape'
+        Send-TestKey 'd'
+        Get-TestScreen | Should -Match 'Projet · En cours'
+        Get-TestScreen | Should -Match 'Pourquoi : Valider mon diplôme'
+        Send-TestKey 's', 'Enter'
+        $project.steps[0].done | Should -BeTrue
+        $project.sessions | Should -Be 1
+        $tui.Message.Hint | Should -Match '\[j\]'
+        Send-TestKey 'j'
+        $tui.Prompt.Label | Should -Be 'Où j''en suis'
+    }
+    It 'rappelle doucement le projet qui attend, une fois par jour' {
+        $project = New-TdProject -Name 'Mémoire' -NowMs ((Get-TdNowMs) - 9 * 86400000)
+        $project.lastWorkedAt = (Get-TdNowMs) - 5 * 86400000
+        [void](Add-TdProject -Projects $tui.Data.projects -Project $project)
+        Get-TestScreen | Should -Match 'attend depuis 5 jours'
+        Send-TestKey 'B'
+        Get-TestScreen | Should -Not -Match 'attend depuis'
+        $tui.Data.state.nudgeOff = $null
+        Send-TestKey 'b'
+        @($tui.Data.state.tasks | Where-Object { $_.projectId -eq $project.id }).Count | Should -Be 1
+        Get-TestScreen | Should -Not -Match 'attend depuis'
+    }
+    It 'gère les actions du quotidien : ajout, jours, pause, suppression' {
+        Send-TestKey 'P', 'Tab'
+        $tui.Mode | Should -Be 'daily'
+        Send-TestKey 'a'
+        Send-TestText 'Vaisselle 10 ; en semaine'
+        Send-TestKey 'Enter'
+        $action = $tui.Data.daily[0]
+        $action.title | Should -Be 'Vaisselle'
+        $action.minutes | Should -Be 10
+        (@($action.days) -join ',') | Should -Be '1,2,3,4,5'
+        Send-TestKey 'j'
+        Send-TestKey 'Backspace'
+        $tui.Prompt.Text = ''
+        Send-TestText 'week-end'
+        Send-TestKey 'Enter'
+        (@($action.days) -join ',') | Should -Be '6,7'
+        Send-TestKey 'Space'
+        $action.active | Should -BeFalse
+        Get-TestScreen | Should -Match 'en pause'
+        Send-TestKey 'x'
+        $tui.Data.daily.Count | Should -Be 0
+        Send-TestKey 'z'
+        $tui.Data.daily.Count | Should -Be 1
+    }
+    It 'ajoute les actions du jour dès leur création, puis à chaque nouveau jour, sans accumulation' {
+        Send-TestKey 'P', 'Tab', 'a'
+        Send-TestText 'Médicaments 2 @8h'
+        Send-TestKey 'Enter'
+        $action = $tui.Data.daily[0]
+        @($tui.Data.state.tasks | Where-Object { $_.dailyId -eq $action.id }).Count | Should -Be 1
+        $tui.Mode = 'main'
+        Get-TestScreen | Should -Match 'quotidien'
+        $tui.Data.state.dayKey = '2000-01-01'
+        Invoke-TdTuiTick -NowMs (Get-TdNowMs)
+        @($tui.Data.state.tasks | Where-Object { $_.dailyId -eq $action.id }).Count | Should -Be 1
         $tui.Data.state.review.Count | Should -Be 0
     }
 }

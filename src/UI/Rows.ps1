@@ -157,7 +157,7 @@ function Update-TdUpNext {
     }
     else { $ui.ParkedBar.Visibility = 'Collapsed' }
     $nudge = $null
-    if (-not $script:Td.FocusMode) { $nudge = Get-TdProjectNudge -Projects (Get-TdProjects) -State $state -NowMs $NowMs }
+    if (-not $script:Td.FocusMode) { $nudge = Get-TdProjectNudge -Projects $script:Td.Data.projects -State $state -NowMs $NowMs }
     if ($nudge) {
         $ui.ProjectNudge.Visibility = 'Visible'
         $ui.ProjectNudgeText.Text = '{0}  {1}' -f $nudge.project.emoji, (Get-TdNudgeText $nudge)
@@ -204,7 +204,7 @@ function New-TdTaskRow {
         $r.CatEmoji.Text = [string][char]0x2022
         $r.CatEmoji.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MutedBrush')
     }
-    $project = Find-TdProject (Get-TdProjects) $Task.projectId
+    $project = Find-TdProject $script:Td.Data.projects $Task.projectId
     if ($project -and -not $category) {
         $r.CatEmoji.Text = $project.emoji
         $r.CatEmoji.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'TextBrush')

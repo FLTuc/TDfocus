@@ -21,12 +21,15 @@ function Initialize-TdTui {
         LastHeartbeat = [long]0
         LastFrame     = @()
         LastSize      = ''
+        CrumbProjectId = $null
     }
     $now = Get-TdNowMs
     $state = $Data.state
     $paused = Repair-TdStaleTimer -State $state -NowMs $now
     [void](Invoke-TdDayRollover -State $state -NowMs $now)
+    $dailyAdded = Sync-TdDailyTasks -State $state -Daily $Data.daily -NowMs $now
     Sync-TdState $state $now
+    if ($dailyAdded -gt 0) { Update-TdPlanBaseline -State $state -NowMs $now }
     $Data.history = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdHistory -History $Data.history -NowMs $now))
     $Data.checkins = [System.Collections.Generic.List[object]]::new([object[]](Limit-TdCheckIns -CheckIns $Data.checkins -NowMs $now))
     Initialize-TdSignalMemory -State $state -Settings $Data.settings -NowMs $now -Memory $script:Tui.Signals
@@ -96,7 +99,8 @@ function Complete-TdTuiTask {
     param([string]$Id)
     $state = $script:Tui.Data.state
     $settings = $script:Tui.Data.settings
-    $done = Complete-TdTask -State $state -Id $Id -NowMs (Get-TdNowMs) -KeepRunning:([bool]$settings.autoStartNext)
+    $now = Get-TdNowMs
+    $done = Complete-TdTask -State $state -Id $Id -NowMs $now -KeepRunning:([bool]$settings.autoStartNext)
     if (-not $done) { return }
     $script:Tui.Data.history.Add((New-TdHistoryEntry $done))
     try { Save-TdHistory $script:Tui.Data.history } catch { Write-TdLog "Historique non enregistré : $($_.Exception.Message)" }
@@ -104,10 +108,22 @@ function Complete-TdTuiTask {
     Complete-TdTuiChange
     $text = '{0} « {1} » terminée. Bravo !' -f [char]0x2713, $done.title
     if ($state.tasks.Count -eq 0) { $text = [string][char]0x2713 + ' Liste terminée. Bravo, tu peux souffler !' }
-    Show-TdTuiMessage -Text $text -Color 'success' -Seconds 8 -UndoData @{ Id = $done.id } -Undo {
+    $hint = $null
+    $project = $null
+    if ($done.projectId) { $project = Complete-TdProjectBlock -Projects $script:Tui.Data.projects -Task $done -NowMs $now }
+    if ($project) {
+        # Noter où l'on s'arrête tant que c'est frais : la reprise sera facile.
+        Save-TdTuiProjects
+        $script:Tui.CrumbProjectId = $project.id
+        $text = '{0} Bloc fait pour « {1} ». Bravo !' -f [char]0x2713, $project.name
+        $hint = "[j] où j'en suis · [z] annuler"
+    }
+    Show-TdTuiMessage -Text $text -Color 'success' -Seconds 10 -Hint $hint -UndoData @{ Id = $done.id } -Undo {
         param($d)
         $s = $script:Tui.Data.state
-        if (Undo-TdComplete -State $s -Id $d.Id -NowMs (Get-TdNowMs)) {
+        $restored = Undo-TdComplete -State $s -Id $d.Id -NowMs (Get-TdNowMs)
+        if ($restored) {
+            if ($restored.projectId -and (Undo-TdProjectBlock -Projects $script:Tui.Data.projects -Task $restored)) { Save-TdTuiProjects }
             $h = $script:Tui.Data.history
             for ($i = $h.Count - 1; $i -ge 0; $i--) { if ($h[$i].id -eq $d.Id) { $h.RemoveAt($i) } }
             try { Save-TdHistory $h } catch { $null = $_ }
@@ -158,6 +174,7 @@ function Complete-TdTuiStep {
         if ((Get-TdStepProgress $current).total -eq 0) { Show-TdTuiMessage -Text 'Pas de sous-étapes : [p] pour en ajouter.' -Color 'muted' }
         return
     }
+    if ($current.projectId -and (Sync-TdProjectFromTask -Projects $script:Tui.Data.projects -Task $current)) { Save-TdTuiProjects }
     $settings = $script:Tui.Data.settings
     if ($settings.completionSound) { Invoke-TdTuiSoundIf -Name 'complete' -Volume ($settings.effectsVolume * 0.5) }
     Complete-TdTuiChange
@@ -166,7 +183,16 @@ function Complete-TdTuiStep {
 }
 
 function Undo-TdTuiStep {
-    if (Undo-TdStep -State $script:Tui.Data.state) { Complete-TdTuiChange }
+    $state = $script:Tui.Data.state
+    if (-not (Undo-TdStep -State $state)) { return }
+    $current = Get-TdCurrentTask $state
+    if ($current.projectId -and (Sync-TdProjectFromTask -Projects $script:Tui.Data.projects -Task $current)) { Save-TdTuiProjects }
+    Complete-TdTuiChange
+}
+
+function Get-TdTuiNudge {
+    if ($script:Tui.Mode -ne 'main') { return $null }
+    Get-TdProjectNudge -Projects $script:Tui.Data.projects -State $script:Tui.Data.state -NowMs (Get-TdNowMs)
 }
 
 function Remove-TdTuiSelected {
@@ -548,6 +574,8 @@ function Invoke-TdTuiKey {
             if ($ch -ceq 'q') { $tui.Mode = 'main' }
             return
         }
+        'projects' { Invoke-TdTuiProjectsKey $Key; return }
+        'daily' { Invoke-TdTuiDailyKey $Key; return }
         { $_ -in @('help', 'stats') } {
             if ($Key.Key -eq 'Escape' -or $ch -ceq 'q' -or $ch -ceq '?') { $tui.Mode = 'main' }
             return
@@ -607,6 +635,24 @@ function Invoke-TdTuiKey {
             Save-TdTuiSettings
         }
         'R' { if ((Restore-TdParked -State $tui.Data.state -All) -gt 0) { Complete-TdTuiChange -Replan } }
+        'P' { $tui.Mode = 'projects'; $tui.ListSel = 0 }
+        'b' {
+            $nudge = Get-TdTuiNudge
+            if ($nudge) { Add-TdTuiProjectBlock $nudge.project }
+        }
+        'B' {
+            if (Get-TdTuiNudge) {
+                $tui.Data.state.nudgeOff = Get-TdDayKey (Get-TdNowMs)
+                Save-TdTuiState
+            }
+        }
+        'j' {
+            # Note de reprise : projet du bloc tout juste terminé, sinon celui du bloc en cours.
+            $project = Find-TdProject $tui.Data.projects $tui.CrumbProjectId
+            $current = Get-TdCurrentTask $tui.Data.state
+            if (-not $project -and $current) { $project = Find-TdProject $tui.Data.projects $current.projectId }
+            if ($project) { Open-TdTuiBreadcrumbPrompt $project }
+        }
         'q' { $tui.Quit = $true }
     }
 }
@@ -620,6 +666,9 @@ function Invoke-TdTuiTick {
     $settings = $tui.Data.settings
     if ((Get-TdDayKey $NowMs) -ne $state.dayKey) {
         [void](Invoke-TdDayRollover -State $state -NowMs $NowMs)
+        [void](Sync-TdDailyTasks -State $state -Daily $tui.Data.daily -NowMs $NowMs)
+        Sync-TdState $state $NowMs
+        Update-TdPlanBaseline -State $state -NowMs $NowMs
         Save-TdTuiState
         Open-TdTuiReviewIfNeeded
     }

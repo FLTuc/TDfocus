@@ -82,8 +82,12 @@ function Get-TdTuiFocusLines {
     elseif ($null -ne $pausedMs) { $stateText = 'En pause ' + (Format-TdPausedFor $pausedMs); $stateColor = 'accent' }
     elseif ($elapsed -gt 0) { $stateText = 'En pause' }
     $catName = ''
+    $dot = Format-TdTuiCategoryDot $category
+    $project = Find-TdProject $script:Tui.Data.projects $current.projectId
     if ($category) { $catName = $category.name + ' · ' }
-    $lines.Add('  ' + (Format-TdTuiCategoryDot $category) + ' ' + (Format-TdTui -Text $catName -Color 'muted') + (Format-TdTui -Text $stateText -Color $stateColor))
+    elseif ($project) { $dot = $project.emoji; $catName = 'Projet · ' }
+    elseif ($current.dailyId) { $dot = Format-TdTui -Text ([string][char]0x21BB) -Color 'success'; $catName = 'Quotidien · ' }
+    $lines.Add('  ' + $dot + ' ' + (Format-TdTui -Text $catName -Color 'muted') + (Format-TdTui -Text $stateText -Color $stateColor))
     $lines.Add('  ' + (Format-TdTui -Text (Limit-TdTuiText -Text $current.title -Width $inner) -Color 'title' -Bold))
 
     # Minuteur
@@ -108,6 +112,9 @@ function Get-TdTuiFocusLines {
     if ($item.gapMs -ge 60000 -and -not $running) { $meta = 'créneau à {0} (dans {1}) · prévu {2}' -f $current.fixedStart, (Format-TdDurationMs $item.gapMs), (Format-TdDurationMs $current.plannedMs) }
     $barWidth = [Math]::Max(10, [Math]::Min(36, $Width - 46))
     $lines.Add('  ' + (Get-TdProgressBar -Fraction $fraction -Width $barWidth -Color $barColor) + '  ' + (Format-TdTui -Text (Limit-TdTuiText -Text $meta -Width ($Width - $barWidth - 5)) -Color 'muted'))
+    # Reprise d'un projet : là où l'on s'était arrêté, sinon la raison de s'y mettre.
+    if ($project -and $project.breadcrumb) { $lines.Add('  ' + (Format-TdTui -Text (Limit-TdTuiText -Text ("Où j'en étais : " + $project.breadcrumb) -Width $inner) -Color 'muted')) }
+    elseif ($project -and $project.why) { $lines.Add('  ' + (Format-TdTui -Text (Limit-TdTuiText -Text ('Pourquoi : ' + $project.why) -Width $inner) -Color 'muted')) }
 
     # Étape en cours
     $progress = Get-TdStepProgress $current
@@ -169,6 +176,8 @@ function Get-TdTuiListLines {
         }
         $progress = Get-TdStepProgress $task
         if ($progress.total -gt 0) { $extra += 'étapes {0}/{1}' -f $progress.done, $progress.total }
+        if ($task.projectId) { $extra += 'bloc projet' }
+        elseif ($task.dailyId) { $extra += [string][char]0x21BB + ' quotidien' }
         $right = (Format-TdDurationMs $task.plannedMs).PadLeft(7) + '  ' + (Format-TdTui -Text ([string][char]0x2192) -Color 'muted') + ' ' + (Format-TdTui -Text (Format-TdClock $item.endMs) -Bold) + ' '
         $extraText = ''
         if ($extra.Count -gt 0) { $extraText = '  ' + ($extra -join ' · ') }
@@ -187,6 +196,12 @@ function Get-TdTuiListLines {
         $rows.Add(@{ index = $i; text = (Join-TdTuiColumns -Left $left -Right $right -Width $Width) })
     }
     $footer = [System.Collections.Generic.List[string]]::new()
+    $nudge = Get-TdTuiNudge
+    if ($nudge) {
+        $keys = '  [b] +{0} aujourd''hui · [B] pas aujourd''hui' -f (Format-TdMinutes $nudge.project.blockMinutes)
+        $text = Limit-TdTuiText -Text (Get-TdNudgeText $nudge) -Width ($Width - 6 - $keys.Length)
+        $footer.Add('  ' + $nudge.project.emoji + ' ' + (Format-TdTui -Text $text -Color 'accent') + (Format-TdTui -Text $keys -Color 'muted'))
+    }
     if ($upcoming -eq 0) {
         $msg = "Rien d'autre pour l'instant. C'est très bien comme ça."
         if ($count -eq 0) { $msg = 'La file est vide.' }
@@ -269,11 +284,13 @@ function Get-TdTuiKeysLine {
         'routines' { '[1-9] charger une routine · Échap retour' }
         'notes' { '↑↓ choisir · [Entrée] en faire une tâche · [x] supprimer · [n] noter · Échap retour' }
         'settings' { '↑↓ choisir · [Entrée]/[Espace] changer · ←/→ régler · Échap retour' }
+        'projects' { '↑↓ · Entrée bloc aujourd''hui · a nouveau · s pas · f pas fait · j où j''en suis · w pourquoi · e échéance · m durée · p attente · t terminé · x suppr. · Tab quotidien · Échap' }
+        'daily' { '↑↓ choisir · a ajouter · Espace activer/mettre en pause · j jours · x supprimer · Tab projets · Échap retour' }
         'stats' { 'Échap retour' }
         'help' { 'Échap retour' }
         default {
             if ($tui.Prompt) { '[Entrée] valider · Échap annuler · Ctrl+U effacer' }
-            else { 'Espace démarrer/pause · Entrée terminer · s étape · a ajouter · l plus tard · +/− 1 min · n note · r routines · o réglages · ? aide · q quitter' }
+            else { 'Espace démarrer/pause · Entrée terminer · s étape · a ajouter · l plus tard · +/− 1 min · P projets · n note · r routines · o réglages · ? aide · q quitter' }
         }
     }
     ' ' + (Format-TdTui -Text (Limit-TdTuiText -Text $text -Width ($Width - 2)) -Color 'muted')
@@ -366,7 +383,9 @@ function Get-TdTuiHelpFrame {
         @('d / v / x', 'commencer maintenant / marquer faite / supprimer la tâche choisie'),
         @('z', 'annuler la dernière action'), @('n / N', 'note rapide / bloc-notes'),
         @('r / t / o', 'routines / statistiques / réglages'), @('m', 'compte à rebours ou progressif'),
-        @('R', 'ramener les tâches reportées'), @('q', 'quitter (le minuteur continue de compter)')
+        @('R', 'ramener les tâches reportées'), @('P', 'projets et quotidien (Tab pour passer de l''un à l''autre)'),
+        @('b / B', 'rappel de projet : ajouter un bloc aujourd''hui / pas aujourd''hui'), @('j', 'noter où j''en suis dans le projet'),
+        @('q', 'quitter (le minuteur continue de compter)')
     )
     $body = [System.Collections.Generic.List[string]]::new()
     $body.Add('')
@@ -478,6 +497,8 @@ function Get-TdTuiFrame {
         'stats' { Get-TdTuiStatsFrame -NowMs $NowMs -Width $Width -Height $Height }
         'notes' { Get-TdTuiNotesFrame -NowMs $NowMs -Width $Width -Height $Height }
         'settings' { Get-TdTuiSettingsFrame -NowMs $NowMs -Width $Width -Height $Height }
+        'projects' { Get-TdTuiProjectsFrame -NowMs $NowMs -Width $Width -Height $Height }
+        'daily' { Get-TdTuiDailyFrame -NowMs $NowMs -Width $Width -Height $Height }
         default { Get-TdTuiMainFrame -NowMs $NowMs -Width $Width -Height $Height }
     }
     , @(foreach ($line in $frame) { Limit-TdTuiLine -Line $line -Width $Width })

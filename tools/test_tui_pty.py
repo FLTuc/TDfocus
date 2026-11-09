@@ -287,6 +287,49 @@ def scenario_review(pwsh, base):
     assert saved["review"] == []
 
 
+def scenario_projects(pwsh, base):
+    print("Scénario : projets et quotidien", flush=True)
+    env = make_env(os.path.join(base, "projects"))
+    tui = Tui(pwsh, env)
+    tui.wait_for("Qu'est-ce qui compte maintenant")
+    step("nouveau projet, puis son premier pas")
+    tui.send("P")
+    tui.wait_for("Aucun projet")
+    tui.send("a")
+    tui.wait_for("Nouveau projet")
+    tui.type_line("Rénover la cuisine ; recevoir mes amis")
+    tui.wait_for("Premier pas")
+    tui.type_line("Mesurer les murs")
+    tui.wait_for("Prochain pas : Mesurer les murs")
+    tui.wait_for("Pourquoi : recevoir mes amis")
+    step("bloc de 25 min ajouté à la journée")
+    tui.send("\r")
+    tui.wait_for("ajouté à ta journée")
+    step("action du quotidien")
+    tui.send("\t")
+    tui.wait_for("CHAQUE JOUR, TOUT SEUL")
+    tui.send("a")
+    tui.type_line("Vaisselle 10")
+    tui.wait_for("ajoutée au quotidien")
+    tui.wait_for("tous les jours")
+    step("retour à la journée")
+    tui.send("q")
+    tui.wait_for("Projet · Pas encore commencée")
+    tui.wait_for("Vaisselle  ↻ quotidien")
+    tui.send("q")
+    code = tui.wait_exit()
+    assert code == 0, "code de sortie %s" % code
+    projects = read_json(env, "projects.json")["items"]
+    assert projects[0]["name"] == "Rénover la cuisine", projects
+    assert projects[0]["steps"][0]["title"] == "Mesurer les murs"
+    daily = read_json(env, "daily.json")["items"]
+    assert daily[0]["title"] == "Vaisselle" and daily[0]["minutes"] == 10, daily
+    state = read_json(env, "state.json")
+    assert any(t.get("projectId") == projects[0]["id"] for t in state["tasks"]), state["tasks"]
+    assert any(t.get("dailyId") == daily[0]["id"] for t in state["tasks"]), state["tasks"]
+    step("projets, quotidien et journée enregistrés")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pwsh", default=shutil.which("pwsh") or "pwsh")
@@ -296,6 +339,7 @@ def main():
     try:
         scenario_main(args.pwsh, base)
         scenario_review(args.pwsh, base)
+        scenario_projects(args.pwsh, base)
         print("OK : TDfocus (terminal) fonctionne dans un vrai terminal.")
     finally:
         if args.keep:

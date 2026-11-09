@@ -208,7 +208,7 @@ function Complete-TdCurrentNow {
     Save-TdHistoryNow
     $project = $null
     if ($done.projectId) {
-        $project = Complete-TdProjectBlock -Projects (Get-TdProjects) -Task $done -NowMs $now
+        $project = Complete-TdProjectBlock -Projects $script:Td.Data.projects -Task $done -NowMs $now
         if ($project) { Save-TdProjectsNow }
     }
     if ($script:Td.EditingId -eq $done.id) { $script:Td.EditingId = $null }
@@ -242,7 +242,7 @@ function Undo-TdCompleteNow {
     param([Parameter(Mandatory)][string]$Id)
     $restored = Undo-TdComplete -State (Get-TdState) -Id $Id -NowMs (Get-TdNowMs)
     if (-not $restored) { return }
-    if ($restored.projectId -and (Undo-TdProjectBlock -Projects (Get-TdProjects) -Task $restored)) { Save-TdProjectsNow }
+    if ($restored.projectId -and (Undo-TdProjectBlock -Projects $script:Td.Data.projects -Task $restored)) { Save-TdProjectsNow }
     $history = $script:Td.Data.history
     for ($i = $history.Count - 1; $i -ge 0; $i--) { if ($history[$i].id -eq $Id) { $history.RemoveAt($i) } }
     Save-TdHistoryNow
@@ -397,7 +397,7 @@ function Complete-TdStepNow {
     if (-not $current) { return }
     $step = Complete-TdStep -State $state
     if (-not $step) { return }
-    if ($current.projectId -and (Sync-TdProjectFromTask -Projects (Get-TdProjects) -Task $current)) { Save-TdProjectsNow }
+    if ($current.projectId -and (Sync-TdProjectFromTask -Projects $script:Td.Data.projects -Task $current)) { Save-TdProjectsNow }
     $settings = Get-TdSettings
     if ($settings.completionSound) { Invoke-TdSoundEffect -Name 'complete' -Volume ($settings.effectsVolume * 0.5) }
     Save-TdStateNow
@@ -414,7 +414,7 @@ function Undo-TdStepNow {
     $state = Get-TdState
     if (Undo-TdStep -State $state) {
         $current = Get-TdCurrentTask $state
-        if ($current.projectId -and (Sync-TdProjectFromTask -Projects (Get-TdProjects) -Task $current)) { Save-TdProjectsNow }
+        if ($current.projectId -and (Sync-TdProjectFromTask -Projects $script:Td.Data.projects -Task $current)) { Save-TdProjectsNow }
         Save-TdStateNow
         Update-TdView
     }
@@ -693,7 +693,7 @@ function Update-TdFocusCard {
     else {
         $ui.CurrentCategory.Visibility = 'Collapsed'
     }
-    $project = Find-TdProject (Get-TdProjects) $current.projectId
+    $project = Find-TdProject $script:Td.Data.projects $current.projectId
     if (-not $category -and ($project -or $current.dailyId)) {
         $ui.CurrentCategory.Visibility = 'Visible'
         $ui.CurrentCategory.SetResourceReference([System.Windows.Controls.Border]::BackgroundProperty, 'SurfaceAltBrush')
