@@ -164,6 +164,40 @@ Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemp
 
 ![Revue du matin](docs/captures/revue.png)
 
+### Projets au long cours et actions du quotidien
+
+Un cerveau TDAH ne gère pas de la même façon ce qui revient chaque jour et ce qui
+s'étale sur des semaines. TDfocus les sépare donc (bouton 🚩 ou touche **P**) :
+
+| | Quotidien (le « run ») | Projets au long cours |
+|---|---|---|
+| Où ils vivent | Ajoutés **tout seuls** dans la journée, les jours prévus | **Hors** de la liste du jour, dans le panneau Projets |
+| Décision à prendre | Aucune | Un **bloc** de 15 à 60 min, quand tu le choisis |
+| Pas fait ? | **Rien ne s'accumule** : l'action revient le prochain jour prévu, sans passer par la revue du matin | Le projet attend. **Un seul rappel doux par jour**, que « Pas aujourd'hui » fait taire |
+| Ce que tu vois | Une tâche comme les autres, marquée ↻ | Seulement les **3 prochains pas**, le **pourquoi** et la note **« où j'en étais »** |
+| Limite | Aucune | **3 projets en cours** au plus. Les suivants attendent, sans culpabilité |
+
+Pourquoi ces choix :
+
+- **Paralysie face aux gros morceaux** : un projet se découpe en **petits pas**, de
+  simples gestes de quelques minutes (« ouvrir le devis », pas « la cuisine »). Un bloc
+  n'en montre que trois, comme sous-étapes de la carte. On ne voit jamais le projet entier.
+- **Démarrer est le plus dur** : un bloc est court (25 min par défaut) et s'ajoute en un
+  clic à la journée.
+- **Mémoire de travail** : à la fin de chaque bloc, TDfocus propose de noter **où tu
+  t'arrêtes**. La note s'affiche sur la carte au bloc suivant, pour reprendre sans effort.
+- **Loin des yeux, loin du cœur** : le projet qui attend depuis le plus longtemps, ou
+  dont l'échéance approche, est rappelé **une fois par jour** sous la file, sur le ton de
+  l'invitation (« Un petit pas aujourd'hui ? »).
+- **Dispersion** : au plus 3 projets en cours. En créer un 4e le range « en attente »,
+  sans reproche.
+- **Motivation par l'intérêt** : le « pourquoi » du projet s'affiche quand un bloc
+  commence.
+- **Cécité temporelle** : l'échéance est dite en jours, semaines ou mois (« échéance dans
+  3 semaines »). Le temps investi et les pas faits restent visibles, sans série à perdre.
+- **Routines sans dette** : les actions du quotidien (médicaments, vaisselle, courrier…)
+  ne demandent aucune décision. Oubliées un jour, elles ne s'empilent pas le lendemain.
+
 ### Stimulations sensorielles (🎧)
 
 - **Ambiances** : bruit blanc, rose ou brun, pluie douce, carillon d'ambiance. Elles sont
@@ -177,6 +211,7 @@ Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemp
 
 | Bouton | Contenu |
 |---|---|
+| 🚩 Projets et quotidien | Projets au long cours (pas, blocs, note de reprise, échéance, 3 en cours au plus) et actions récurrentes ajoutées toutes seules |
 | 📋 Routines | Routine du matin, sprint de deep work, closing de fin de journée, ou toute liste enregistrée en un clic |
 | 📝 Bloc-notes | « Parking à idées » : noter une pensée parasite sans quitter la tâche, puis en faire une tâche plus tard. Chaque tâche a aussi sa propre note |
 | 📊 Estimé vs réel | Graphique des 7 derniers jours, facteur d'estimation médian, détail par catégorie. Aucun score négatif, aucune série à perdre |
@@ -190,6 +225,7 @@ Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemp
 | Espace | Démarrer / pause |
 | Ctrl + Entrée | Valider la tâche en cours |
 | S | Étape faite |
+| P | Projets et quotidien |
 | + / − | Ajouter / retirer 1 minute |
 | L | Reporter la tâche en fin de liste |
 | N ou Ctrl + N | Nouvelle tâche |
@@ -205,7 +241,7 @@ Quand l'historique est suffisant, TDfocus propose une durée ajustée, par exemp
 La version Linux reprend tout, au clavier : minuteur en gros chiffres (compte à rebours ou
 progressif), heure de fin de la liste et décalage, file avec heures projetées et créneaux
 figés, sous-étapes, atterrissage, compteur de pause, points de contrôle, revue du matin,
-ambiances sonores, routines, bloc-notes, statistiques et réglages. Les couleurs
+ambiances sonores, projets et quotidien, routines, bloc-notes, statistiques et réglages. Les couleurs
 s'adaptent (24 bits, `NO_COLOR` respecté) et l'écran se réorganise selon la taille du
 terminal.
 
@@ -222,6 +258,9 @@ terminal.
 | z | Annuler la dernière action |
 | o / g | Pendant un point de contrôle : oui / je me suis égaré·e |
 | n / N | Note rapide / bloc-notes |
+| P | Projets (Tab : quotidien). Entrée ajoute un bloc, `a` crée un projet (« nom ; pourquoi ; échéance »), `s` ajoute un pas, `f` coche le prochain, `j` note où tu en es, `p` met en attente |
+| b / B | Rappel du projet qui attend : ajouter un bloc aujourd'hui / pas aujourd'hui |
+| j | Après un bloc projet : noter où tu t'arrêtes |
 | r / t / o / ? | Routines / statistiques / réglages / aide |
 | q | Quitter (le minuteur continue de compter) |
 
@@ -247,6 +286,7 @@ terminal.
 | Prise de notes | Phase 3 | ✅ (parking à idées + note par tâche) |
 | Sous-étapes, signal d'atterrissage, compteur de pause | Ajout | ✅ |
 | Point de contrôle au carillon, revue du matin | Ajout | ✅ |
+| Projets au long cours et actions du quotidien | Ajout | ✅ |
 | Version Linux | Ajout | ✅ (terminal, PowerShell 7) |
 
 ### Adaptation des spécifications techniques
@@ -281,7 +321,8 @@ src/
   TDfocus.Core.ps1     chargeur du cœur logique (partagé avec les tests)
   Core/                logique pure, testée : tâches et sous-étapes, projection horaire, saisie
                        rapide, routines, statistiques, imports (iCal, Todoist, Notion, texte),
-                       notes, signaux (atterrissage, fin, carillon), points de contrôle, revue
+                       notes, signaux (atterrissage, fin, carillon), points de contrôle, revue,
+                       projets au long cours et actions du quotidien
   Storage.ps1          persistance JSON atomique, sauvegardes, chiffrement des jetons
   Audio/               synthèse sonore (PowerShell pur) et lecture
   Platform/            Windows (clé Run, lanceur TDfocus.exe, imports réseau) et Linux (XDG,
@@ -307,6 +348,9 @@ Invoke-Pester -Path tests
 - `tests/Core.Tests.ps1` : moteur séquentiel, projection horaire, statistiques, stockage.
 - `tests/Features.Tests.ps1` : sous-étapes, compteur de pause, signaux, points de contrôle,
   revue du matin.
+- `tests/Projects.Tests.ps1` : projets (pas, blocs, limite de 3, note de reprise, rappel
+  doux, échéances) et actions du quotidien (jours, ajout unique par jour, pas
+  d'accumulation au changement de jour).
 - `tests/Terminal.Tests.ps1` : version Linux (largeur des caractères, écrans à toutes les
   tailles, clavier, minuteur, intégration XDG).
 - `tools/test_tui_pty.py` : lance la version Linux dans un vrai pseudo-terminal, la pilote au
