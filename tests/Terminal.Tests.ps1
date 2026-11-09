@@ -6,7 +6,7 @@ param()
 BeforeAll {
     $script:SrcDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'src'
     . (Join-Path $script:SrcDir 'TDfocus.Core.ps1')
-    foreach ($part in @('Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects')) {
+    foreach ($part in @('Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects', 'Terminal/Routines')) {
         . (Join-Path $script:SrcDir "$part.ps1")
     }
     $script:SavedData = $env:TDFOCUS_DATA
@@ -478,6 +478,80 @@ Describe 'Projets et quotidien (terminal)' {
         Invoke-TdTuiTick -NowMs (Get-TdNowMs)
         @($tui.Data.state.tasks | Where-Object { $_.dailyId -eq $action.id }).Count | Should -Be 1
         $tui.Data.state.review.Count | Should -Be 0
+    }
+}
+
+Describe 'Routines et quotidien modifiables (terminal)' {
+    BeforeEach { $tui = Initialize-TestTui }
+
+    It 'modifie la routine du matin puis l''enregistre' {
+        Send-TestKey 'r', 'e'
+        $tui.Mode | Should -Be 'routine-edit'
+        Send-TestKey 'n'
+        $tui.Prompt.Text = ''
+        Send-TestText 'Démarrage de journée'
+        Send-TestKey 'Enter'
+        Send-TestKey 'a'
+        Send-TestText "Point d'équipe 15 | Tour de table ; Blocages"
+        Send-TestKey 'Enter'
+        $tui.RoutineDraft.items.Count | Should -Be 6
+        $tui.RoutineDraft.items[5].steps.Count | Should -Be 2
+        $tui.ItemSel = 1
+        Send-TestKey 'Enter'
+        $tui.Prompt.Text | Should -Be 'Relever les e-mails et messages urgents 10'
+        $tui.Prompt.Text = ''
+        Send-TestText 'Relever les e-mails 20'
+        Send-TestKey 'Enter'
+        $tui.RoutineDraft.items[1].minutes | Should -Be 20
+        $tui.RoutineDraft.items[1].categoryId | Should -Be 'communication'
+        $tui.ItemSel = 0
+        Send-TestKey 'x'
+        $tui.ItemSel = 4
+        Send-TestKey 'K'
+        ($tui.RoutineDraft.items | ForEach-Object title)[3] | Should -Be 'Point d''équipe'
+        Get-TestScreen | Should -Match 'MODIFIER LA ROUTINE'
+        Send-TestKey 's'
+        $tui.Mode | Should -Be 'routines'
+        $morning = Get-TdTuiTemplates | Where-Object { $_.id -eq 'builtin-morning' }
+        $morning.name | Should -Be 'Démarrage de journée'
+        @($morning.items).Count | Should -Be 5
+        (Read-TdJsonFile (Get-TdDataPath 'templates.json')).items[0].name | Should -Be 'Démarrage de journée'
+        Get-TestScreen | Should -Match 'modifiée'
+        Send-TestKey 'R'
+        (Get-TdTuiTemplates | Where-Object { $_.id -eq 'builtin-morning' }).name | Should -Be 'Routine du matin'
+    }
+    It 'abandonne les modifications avec Échap' {
+        Send-TestKey 'r', 'e', 'x', 'x', 'Escape'
+        $tui.Mode | Should -Be 'routines'
+        @((Get-TdTuiTemplates | Where-Object { $_.id -eq 'builtin-morning' }).items).Count | Should -Be 5
+        $tui.Data.templates.Count | Should -Be 0
+    }
+    It 'supprime une routine d''origine, puis la rétablit' {
+        Send-TestKey 'r', 'Down', 'x'
+        @(Get-TdTuiTemplates).Count | Should -Be 2
+        Get-TestScreen | Should -Match 'supprimée'
+        Send-TestKey 'z'
+        @(Get-TdTuiTemplates).Count | Should -Be 3
+        Send-TestKey 'Down', 'x', 'R'
+        @(Get-TdTuiTemplates).Count | Should -Be 3
+    }
+    It 'charge la routine choisie avec Entrée' {
+        Send-TestKey 'r', 'Down', 'Down', 'Enter'
+        $tui.Mode | Should -Be 'main'
+        $tui.Data.state.tasks[0].title | Should -Be 'Traiter les messages restants'
+    }
+    It 'modifie une action du quotidien et sa tâche du jour' {
+        $action = New-TdDailyAction -Title 'Point d''équipe' -Minutes 15 -FixedStart '09:30'
+        $tui.Data.daily.Add($action)
+        [void](Sync-TdDailyTasks -State $tui.Data.state -Daily $tui.Data.daily)
+        Send-TestKey 'P', 'Tab', 'e'
+        $tui.Prompt.Text | Should -Be 'Point d''équipe 15 @09:30'
+        $tui.Prompt.Text = ''
+        Send-TestText 'Point d''équipe 20 @9h45'
+        Send-TestKey 'Enter'
+        $action.minutes | Should -Be 20
+        $action.fixedStart | Should -Be '09:45'
+        ($tui.Data.state.tasks | Where-Object { $_.dailyId -eq $action.id }).plannedMs | Should -Be (20 * $Min)
     }
 }
 

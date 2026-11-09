@@ -259,6 +259,16 @@ function Invoke-TdTuiDailyKey {
     }
     if (-not $action) { return }
     switch -CaseSensitive ($ch) {
+        'e' {
+            Open-TdTuiPrompt -Label 'Modifier' -Text (ConvertTo-TdDailyActionText $action) -Hint 'titre durée @heure' -Data $action.id -OnSubmit {
+                param($text, $id)
+                $a = $script:Tui.Data.daily | Where-Object { $_.id -eq $id } | Select-Object -First 1
+                if (-not $a -or -not (Set-TdDailyActionFromText -Action $a -Text $text)) { return }
+                Save-TdTuiDaily
+                if (Update-TdDailyTaskToday -State $script:Tui.Data.state -Action $a) { Complete-TdTuiChange -Replan }
+                Show-TdTuiMessage -Text ('« {0} » modifiée.' -f $a.title) -Seconds 4
+            }
+        }
         'j' {
             Open-TdTuiPrompt -Label 'Jours' -Text (Format-TdDays $action.days) -Hint 'tous les jours · en semaine · week-end · lun mer ven' -Data $action.id -OnSubmit {
                 param($text, $id)

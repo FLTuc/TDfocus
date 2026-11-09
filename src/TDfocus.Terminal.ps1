@@ -31,7 +31,7 @@ $script:TdVersion = '1.0.0'
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'TDfocus.Core.ps1')
-foreach ($part in @('Audio/Synth', 'Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects')) {
+foreach ($part in @('Audio/Synth', 'Platform/Linux', 'Terminal/Text', 'Terminal/Audio', 'Terminal/View', 'Terminal/App', 'Terminal/Projects', 'Terminal/Routines')) {
     . (Join-Path $PSScriptRoot "$part.ps1")
 }
 

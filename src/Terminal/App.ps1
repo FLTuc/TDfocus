@@ -22,6 +22,9 @@ function Initialize-TdTui {
         LastFrame     = @()
         LastSize      = ''
         CrumbProjectId = $null
+        RoutineDraft  = $null
+        RoutineOrigin = $null
+        ItemSel       = 0
     }
     $now = Get-TdNowMs
     $state = $Data.state
@@ -80,10 +83,6 @@ function Get-TdTuiSelectedTask {
     $state = $script:Tui.Data.state
     if ($state.tasks.Count -eq 0) { return $null }
     $state.tasks[[Math]::Min($script:Tui.Sel, $state.tasks.Count - 1)]
-}
-
-function Get-TdTuiTemplates {
-    @(Get-TdBuiltInTemplates) + @($script:Tui.Data.templates)
 }
 
 # ---------------------------------------------------------------- actions
@@ -322,7 +321,7 @@ function Save-TdTuiCurrentAsTemplate {
     $state = $script:Tui.Data.state
     if ([string]::IsNullOrWhiteSpace($Name) -or $state.tasks.Count -eq 0) { return }
     $script:Tui.Data.templates.Add((New-TdTemplateFromTasks -Name $Name -Tasks @($state.tasks)))
-    try { Save-TdTemplates $script:Tui.Data.templates } catch { $null = $_ }
+    Save-TdTuiTemplates
     Show-TdTuiMessage -Text ('Routine « {0} » enregistrée.' -f $Name.Trim()) -Seconds 4
 }
 
@@ -535,15 +534,8 @@ function Invoke-TdTuiKey {
             }
             return
         }
-        'routines' {
-            if ($ch -match '^[1-9]$') { Add-TdTuiTemplate -Number ([int]$ch); return }
-            if ($ch -ceq 's') {
-                Open-TdTuiPrompt -Label 'Nom de la routine' -Hint 'enregistre toute la liste actuelle' -OnSubmit { param($text) Save-TdTuiCurrentAsTemplate -Name $text }
-                return
-            }
-            if ($Key.Key -eq 'Escape' -or $ch -ceq 'q') { $tui.Mode = 'main' }
-            return
-        }
+        'routines' { Invoke-TdTuiRoutinesKey $Key; return }
+        'routine-edit' { Invoke-TdTuiRoutineEditKey $Key; return }
         'notes' {
             $count = $tui.Data.notes.Count
             switch ($Key.Key) {
@@ -624,7 +616,7 @@ function Invoke-TdTuiKey {
         'z' { if ($tui.Undo) { $u = $tui.Undo; $tui.Undo = $null; $tui.Message = $null; & $u.Action $u.Data } }
         'n' { Open-TdTuiPrompt -Label 'Note rapide' -Hint 'une pensée parasite ? note-la et reviens' -OnSubmit { param($text) Add-TdTuiNote -Text $text } }
         'N' { $tui.Mode = 'notes'; $tui.ListSel = 0 }
-        'r' { $tui.Mode = 'routines' }
+        'r' { $tui.Mode = 'routines'; $tui.ListSel = 0 }
         't' { $tui.Mode = 'stats' }
         'o' { $tui.Mode = 'settings'; $tui.ListSel = 0 }
         '?' { $tui.Mode = 'help' }

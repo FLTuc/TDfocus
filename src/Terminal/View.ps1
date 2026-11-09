@@ -281,11 +281,12 @@ function Get-TdTuiKeysLine {
     $tui = $script:Tui
     $text = switch ($tui.Mode) {
         'review' { '↑↓ choisir · [g] garder · [d] demain · [a] abandonner · [G] tout garder · Échap : garder le reste' }
-        'routines' { '[1-9] charger une routine · Échap retour' }
+        'routines' { '↑↓ choisir · Entrée ou [1-9] charger · e modifier · x supprimer · R rétablir l''original · s enregistrer la liste · Échap retour' }
+        'routine-edit' { '↑↓ choisir · a ajouter · Entrée modifier · x retirer · K/J monter/descendre · n renommer · s enregistrer · Échap abandonner' }
         'notes' { '↑↓ choisir · [Entrée] en faire une tâche · [x] supprimer · [n] noter · Échap retour' }
         'settings' { '↑↓ choisir · [Entrée]/[Espace] changer · ←/→ régler · Échap retour' }
         'projects' { '↑↓ · Entrée bloc aujourd''hui · a nouveau · s pas · f pas fait · j où j''en suis · w pourquoi · e échéance · m durée · p attente · t terminé · x suppr. · Tab quotidien · Échap' }
-        'daily' { '↑↓ choisir · a ajouter · Espace activer/mettre en pause · j jours · x supprimer · Tab projets · Échap retour' }
+        'daily' { '↑↓ choisir · a ajouter · e modifier · Espace activer/mettre en pause · j jours · x supprimer · Tab projets · Échap retour' }
         'stats' { 'Échap retour' }
         'help' { 'Échap retour' }
         default {
@@ -393,26 +394,6 @@ function Get-TdTuiHelpFrame {
     Get-TdTuiPage -NowMs $NowMs -Width $Width -Height $Height -Title 'Aide' -Body $body.ToArray()
 }
 
-function Get-TdTuiRoutinesFrame {
-    param([long]$NowMs, [int]$Width, [int]$Height)
-    $body = [System.Collections.Generic.List[string]]::new()
-    $body.Add('')
-    $body.Add('  ' + (Format-TdTui -Text 'Les tâches de la routine s''ajoutent à la fin de ta liste.' -Color 'muted'))
-    $body.Add('')
-    $n = 0
-    foreach ($tpl in (Get-TdTuiTemplates)) {
-        $n++
-        if ($n -gt 9) { break }
-        $total = 0.0
-        foreach ($it in $tpl.items) { $total += [double]$it.minutes }
-        $line = '{0}  {1} · {2} tâche(s) · {3}' -f $n, $tpl.name, @($tpl.items).Count, (Format-TdMinutes $total)
-        $body.Add('  ' + (Format-TdTui -Text ([string]$n) -Color 'accent' -Bold) + (Limit-TdTuiText -Text $line.Substring(1) -Width ($Width - 4)))
-    }
-    $body.Add('')
-    $body.Add('  ' + (Format-TdTui -Text 'Pour enregistrer la liste actuelle comme routine : [s] puis son nom.' -Color 'muted'))
-    Get-TdTuiPage -NowMs $NowMs -Width $Width -Height $Height -Title 'Routines' -Body $body.ToArray()
-}
-
 function Get-TdTuiStatsFrame {
     param([long]$NowMs, [int]$Width, [int]$Height)
     $stats = Get-TdStats -History $script:Tui.Data.history -NowMs $NowMs
@@ -494,6 +475,7 @@ function Get-TdTuiFrame {
         'review' { Get-TdTuiReviewFrame -NowMs $NowMs -Width $Width -Height $Height }
         'help' { Get-TdTuiHelpFrame -NowMs $NowMs -Width $Width -Height $Height }
         'routines' { Get-TdTuiRoutinesFrame -NowMs $NowMs -Width $Width -Height $Height }
+        'routine-edit' { Get-TdTuiRoutineEditFrame -NowMs $NowMs -Width $Width -Height $Height }
         'stats' { Get-TdTuiStatsFrame -NowMs $NowMs -Width $Width -Height $Height }
         'notes' { Get-TdTuiNotesFrame -NowMs $NowMs -Width $Width -Height $Height }
         'settings' { Get-TdTuiSettingsFrame -NowMs $NowMs -Width $Width -Height $Height }
