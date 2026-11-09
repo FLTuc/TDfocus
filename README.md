@@ -198,6 +198,12 @@ Pourquoi ces choix :
 - **Routines sans dette** : les actions du quotidien (médicaments, vaisselle, courrier…)
   ne demandent aucune décision. Oubliées un jour, elles ne s'empilent pas le lendemain.
 
+| Projets : pas, pourquoi, note de reprise | Un bloc de projet en cours |
+|---|---|
+| ![Panneau Projets](docs/captures/projets.png) | ![Bloc projet : étape en cours et pourquoi sur la carte](docs/captures/bloc-projet.png) |
+
+![Actions du quotidien et leurs jours](docs/captures/quotidien.png)
+
 ### Stimulations sensorielles (🎧)
 
 - **Ambiances** : bruit blanc, rose ou brun, pluie douce, carillon d'ambiance. Elles sont
