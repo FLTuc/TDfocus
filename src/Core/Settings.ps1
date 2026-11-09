@@ -61,7 +61,8 @@ function ConvertTo-TdSettings {
         }
     }
     $cats = @($cats)
-    if ($cats.Count -eq 0) { $cats = @(Get-TdDefaultCategories) }
+    # Outil de travail : les anciennes catégories par défaut (Maison, Perso, Santé…) sont remplacées.
+    if ($cats.Count -eq 0 -or (Test-TdLegacyCategories $cats)) { $cats = @(Get-TdDefaultCategories) }
     $settings.categories = $cats
     $settings
 }

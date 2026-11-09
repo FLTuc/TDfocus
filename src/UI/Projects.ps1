@@ -369,11 +369,11 @@ function Build-TdDailySection {
     Add-TdSection $Panel 'Chaque jour, tout seul' 'Ces actions s''ajoutent d''elles-mêmes à ta journée les jours prévus, sans rien décider. Pas faites ? Elles ne s''accumulent pas : elles reviennent simplement le prochain jour prévu.'
     $daily = @($script:Td.Data.daily)
     if ($daily.Count -eq 0) {
-        [void]$Panel.Children.Add((New-TdText -Text 'Aucune action pour l''instant. Pense aux petites choses qui reviennent : médicaments, vaisselle, courrier, arroser les plantes…' -Size 13 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,10'))
+        [void]$Panel.Children.Add((New-TdText -Text 'Aucune action pour l''instant. Pense aux petites tâches qui reviennent : relever les e-mails, point d''équipe, saisie des temps, mise à jour du suivi…' -Size 13 -Brush 'MutedBrush' -Wrap -Margin '2,0,0,10'))
     }
     foreach ($action in $daily) { [void]$Panel.Children.Add((New-TdDailyCard -Action $action)) }
 
-    Add-TdSection $Panel 'Nouvelle action du quotidien' 'Même saisie rapide que pour les tâches : « Médicaments 2 @8h », « Vaisselle 10 », « Courrier 5 ».'
+    Add-TdSection $Panel 'Nouvelle action du quotidien' 'Même saisie rapide que pour les tâches : « E-mails 15 @9h », « Point d''équipe 15 @9h30 », « Saisie des temps 5 ».'
     $box = New-TdTextBox -Margin '0,0,0,8'
     $box.ToolTip = 'Titre, durée et heure fixe facultative'
     $box.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { Add-TdDailyNow; $e.Handled = $true } })
@@ -401,10 +401,31 @@ function New-TdDailyCard {
     param([Parameter(Mandatory)]$Action)
     $card = New-TdCard -Padding '12'
     $stack = New-TdPanel
+    if ($script:Td.EditingDailyId -eq $Action.id) {
+        # Modification : même saisie rapide que pour les tâches.
+        [void]$stack.Children.Add((New-TdText -Text 'MODIFIER L''ACTION' -Size 11 -Brush 'AccentBrush' -Bold -Margin '0,0,0,6'))
+        $box = New-TdTextBox -Text (ConvertTo-TdDailyActionText $Action) -Margin '0,0,0,8'
+        $box.Tag = $Action.id
+        $box.ToolTip = 'Titre, durée et heure fixe facultative : « Point d''équipe 15 @9h30 »'
+        $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
+        $box.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { Save-TdDailyEdit -Box $s; $e.Handled = $true } })
+        $box.Add_Loaded({ $this.Focus() | Out-Null; $this.SelectAll() })
+        $script:Td.DailyEditBox = $box
+        [void]$stack.Children.Add($box)
+        $actions = New-TdPanel -Wrap
+        [void]$actions.Children.Add((New-TdButton -Content 'Enregistrer' -Style 'PrimaryButton' -Margin '0,0,6,0' -OnClick { Save-TdDailyEdit -Box $script:Td.DailyEditBox }))
+        [void]$actions.Children.Add((New-TdButton -Content 'Annuler' -OnClick { $script:Td.EditingDailyId = $null; Update-TdDrawer }))
+        [void]$stack.Children.Add($actions)
+        $card.Child = $stack
+        return $card
+    }
     $row = New-Object System.Windows.Controls.DockPanel
     $del = New-TdButton -Content ([string][char]0xE74D) -Style 'SmallIconButton' -ToolTip 'Retirer du quotidien' -Tag $Action.id -OnClick { Remove-TdDailyNow -Id ([string]$this.Tag) }
     [System.Windows.Controls.DockPanel]::SetDock($del, [System.Windows.Controls.Dock]::Right)
     [void]$row.Children.Add($del)
+    $edit = New-TdButton -Content ([string][char]0xE70F) -Style 'SmallIconButton' -ToolTip 'Modifier (titre, durée, heure)' -Tag $Action.id -OnClick { $script:Td.EditingDailyId = [string]$this.Tag; Update-TdDrawer }
+    [System.Windows.Controls.DockPanel]::SetDock($edit, [System.Windows.Controls.Dock]::Right)
+    [void]$row.Children.Add($edit)
     $toggle = New-TdSwitch -Label $Action.title -Checked ([bool]$Action.active) -ToolTip 'Active : ajoutée toute seule les jours prévus. Désactivée : mise de côté.' -OnChange { Set-TdDailyActiveNow -Id ([string]$this.Tag) -Active ([bool]$this.IsChecked) }
     $toggle.Tag = $Action.id
     [void]$row.Children.Add($toggle)
@@ -415,6 +436,21 @@ function New-TdDailyCard {
     [void]$stack.Children.Add((New-TdDayChips -Days @($Action.days) -Tag $Action.id))
     $card.Child = $stack
     $card
+}
+
+function Save-TdDailyEdit {
+    param([Parameter(Mandatory)]$Box)
+    $action = Find-TdDailyAction ([string]$Box.Tag)
+    if (-not $action) { return }
+    if (-not (Set-TdDailyActionFromText -Action $action -Text $Box.Text)) {
+        Show-TdToast -Text 'Écris au moins un titre, par exemple « Point d''équipe 15 @9h30 ».'
+        return
+    }
+    Save-TdDailyNow
+    $script:Td.EditingDailyId = $null
+    if (Update-TdDailyTaskToday -State (Get-TdState) -Action $action) { Complete-TdChange -Replan }
+    Show-TdToast -Text ('« {0} » modifiée.' -f (Limit-TdText $action.title 30))
+    Update-TdDrawer
 }
 
 function Find-TdDailyAction {
@@ -433,7 +469,7 @@ function Update-TdDailyToday {
 function Add-TdDailyNow {
     $box = $script:Td.DailyBox
     $text = $box.Text.Trim()
-    if (-not $text) { Show-TdToast -Text 'Écris l''action, par exemple « Vaisselle 10 ».'; $box.Focus() | Out-Null; return }
+    if (-not $text) { Show-TdToast -Text 'Écris l''action, par exemple « Saisie des temps 5 ».'; $box.Focus() | Out-Null; return }
     $parsed = ConvertFrom-TdQuickInput $text
     if (-not $parsed.title) { return }
     $minutes = $parsed.minutes

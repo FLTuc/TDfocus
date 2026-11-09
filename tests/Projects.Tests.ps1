@@ -210,6 +210,28 @@ Describe 'Actions du quotidien' {
         (Invoke-TdDayRollover -State $state -NowMs (At 0 5 1)).dailyCleared | Should -Be 1
         $state.tasks[0].title | Should -Be 'Vaisselle'
     }
+    It 'modifie une action et sa tâche du jour pas encore commencée' {
+        Sync-TdDailyTasks -State $state -Daily $daily -NowMs (At 7) | Out-Null
+        ConvertTo-TdDailyActionText $meds | Should -Be 'Médicaments 2 @08:00'
+        Set-TdDailyActionFromText -Action $meds -Text 'Point d''équipe 15 @9h30' | Should -BeTrue
+        $meds.title | Should -Be 'Point d''équipe'
+        $meds.minutes | Should -Be 15
+        $meds.fixedStart | Should -Be '09:30'
+        Update-TdDailyTaskToday -State $state -Action $meds | Should -BeTrue
+        $task = $state.tasks | Where-Object dailyId -eq $meds.id
+        $task.title | Should -Be 'Point d''équipe'
+        $task.plannedMs | Should -Be (15 * $Min)
+        Set-TdDailyActionFromText -Action $meds -Text '   ' | Should -BeFalse
+    }
+    It 'ne touche pas à une tâche du jour déjà commencée' {
+        Sync-TdDailyTasks -State $state -Daily $daily -NowMs (At 7) | Out-Null
+        Start-TdTimer $state (At 7)
+        $first = $state.tasks[0]
+        $action = $daily | Where-Object id -eq $first.dailyId
+        [void](Set-TdDailyActionFromText -Action $action -Text 'Autre 20')
+        Update-TdDailyTaskToday -State $state -Action $action | Should -BeFalse
+        $first.title | Should -Not -Be 'Autre'
+    }
     It 'survit à l''enregistrement JSON' {
         $copy = ConvertTo-TdDailyAction (ConvertTo-Json -InputObject $sport -Depth 5 | ConvertFrom-Json)
         $copy.days -join ',' | Should -Be '6,7'

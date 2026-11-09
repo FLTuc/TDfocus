@@ -103,9 +103,9 @@ Il suffit d'écrire, puis de valider avec Entrée :
 |---|---|
 | `Répondre aux emails 15` | 15 min |
 | `Rédiger le rapport 1h30` | 1 h 30 |
-| `Lire 25min` | 25 min |
+| `Relire le contrat 25min` | 25 min |
 | `Point d'équipe 30 @14h` | 30 min, **créneau figé** à 14:00 |
-| `Dentiste à 9h30 45m` | 45 min, créneau figé à 09:30 |
+| `Visio client à 9h30 45m` | 45 min, créneau figé à 09:30 |
 
 Sous le champ se trouvent les **pastilles de durée** (5, 15, 25, 45, 60 min), les
 **catégories** (émoji et couleur douce, sans sous-dossiers) et un champ **heure fixe**.
@@ -180,7 +180,7 @@ s'étale sur des semaines. TDfocus les sépare donc (bouton 🚩 ou touche **P**
 Pourquoi ces choix :
 
 - **Paralysie face aux gros morceaux** : un projet se découpe en **petits pas**, de
-  simples gestes de quelques minutes (« ouvrir le devis », pas « la cuisine »). Un bloc
+  simples gestes de quelques minutes (« ouvrir le cahier des charges », pas « le projet client »). Un bloc
   n'en montre que trois, comme sous-étapes de la carte. On ne voit jamais le projet entier.
 - **Démarrer est le plus dur** : un bloc est court (25 min par défaut) et s'ajoute en un
   clic à la journée.
@@ -195,7 +195,7 @@ Pourquoi ces choix :
   commence.
 - **Cécité temporelle** : l'échéance est dite en jours, semaines ou mois (« échéance dans
   3 semaines »). Le temps investi et les pas faits restent visibles, sans série à perdre.
-- **Routines sans dette** : les actions du quotidien (médicaments, vaisselle, courrier…)
+- **Routines sans dette** : les actions du quotidien (e-mails, point d'équipe, saisie des temps…)
   ne demandent aucune décision. Oubliées un jour, elles ne s'empilent pas le lendemain.
 
 | Projets : pas, pourquoi, note de reprise | Un bloc de projet en cours |

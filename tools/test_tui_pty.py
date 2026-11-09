@@ -212,10 +212,10 @@ def scenario_main(pwsh, base):
     tui.wait_for("Validation annulée.")
     step("note rapide et bloc-notes")
     tui.send("n")
-    tui.type_line("Appeler le garage")
+    tui.type_line("Rappeler le client")
     tui.wait_for("Noté. Retour à ta tâche !")
     tui.send("N")
-    tui.wait_for("Appeler le garage")
+    tui.wait_for("Rappeler le client")
     tui.send("q")
     step("réglages, aide, routines, statistiques")
     tui.send("o")
@@ -243,7 +243,7 @@ def scenario_main(pwsh, base):
     assert [s["done"] for s in steps] == [True, False, False], steps
     assert state["tasks"][0]["plannedMs"] == 35 * 60000
     notes = read_json(env, "notes.json")["items"]
-    assert notes[0]["text"] == "Appeler le garage"
+    assert notes[0]["text"] == "Rappeler le client"
     autostart = os.path.join(env["HOME"], ".config", "autostart", "tdfocus.desktop")
     assert os.path.exists(autostart), "fichier de démarrage automatique absent"
     with open(autostart, encoding="utf-8") as f:
@@ -297,11 +297,11 @@ def scenario_projects(pwsh, base):
     tui.wait_for("Aucun projet")
     tui.send("a")
     tui.wait_for("Nouveau projet")
-    tui.type_line("Rénover la cuisine ; recevoir mes amis")
+    tui.type_line("Refonte du site ; livrer avant le salon")
     tui.wait_for("Premier pas")
-    tui.type_line("Mesurer les murs")
-    tui.wait_for("Prochain pas : Mesurer les murs")
-    tui.wait_for("Pourquoi : recevoir mes amis")
+    tui.type_line("Lister les pages")
+    tui.wait_for("Prochain pas : Lister les pages")
+    tui.wait_for("Pourquoi : livrer avant le salon")
     step("bloc de 25 min ajouté à la journée")
     tui.send("\r")
     tui.wait_for("ajouté à ta journée")
@@ -309,21 +309,21 @@ def scenario_projects(pwsh, base):
     tui.send("\t")
     tui.wait_for("CHAQUE JOUR, TOUT SEUL")
     tui.send("a")
-    tui.type_line("Vaisselle 10")
+    tui.type_line("Saisie des temps 10")
     tui.wait_for("ajoutée au quotidien")
     tui.wait_for("tous les jours")
     step("retour à la journée")
     tui.send("q")
     tui.wait_for("Projet · Pas encore commencée")
-    tui.wait_for("Vaisselle  ↻ quotidien")
+    tui.wait_for("Saisie des temps  ↻ quotidien")
     tui.send("q")
     code = tui.wait_exit()
     assert code == 0, "code de sortie %s" % code
     projects = read_json(env, "projects.json")["items"]
-    assert projects[0]["name"] == "Rénover la cuisine", projects
-    assert projects[0]["steps"][0]["title"] == "Mesurer les murs"
+    assert projects[0]["name"] == "Refonte du site", projects
+    assert projects[0]["steps"][0]["title"] == "Lister les pages"
     daily = read_json(env, "daily.json")["items"]
-    assert daily[0]["title"] == "Vaisselle" and daily[0]["minutes"] == 10, daily
+    assert daily[0]["title"] == "Saisie des temps" and daily[0]["minutes"] == 10, daily
     state = read_json(env, "state.json")
     assert any(t.get("projectId") == projects[0]["id"] for t in state["tasks"]), state["tasks"]
     assert any(t.get("dailyId") == daily[0]["id"] for t in state["tasks"]), state["tasks"]

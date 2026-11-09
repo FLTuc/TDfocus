@@ -144,7 +144,7 @@ function Invoke-TdTuiProjectsKey {
         'Delete' { if ($project) { Remove-TdTuiProject $project }; return }
     }
     switch -CaseSensitive ($ch) {
-        'a' { Open-TdTuiPrompt -Label 'Nouveau projet' -Hint 'nom ; pourquoi ; échéance (ex. Cuisine ; recevoir mes amis ; 15/12)' -OnSubmit { param($text) Add-TdTuiProjectFromText -Text $text } }
+        'a' { Open-TdTuiPrompt -Label 'Nouveau projet' -Hint 'nom ; pourquoi ; échéance (ex. Refonte du site ; livrer avant le salon ; 15/12)' -OnSubmit { param($text) Add-TdTuiProjectFromText -Text $text } }
         'q' { $tui.Mode = 'main' }
         'z' { if ($tui.Undo) { $u = $tui.Undo; $tui.Undo = $null; $tui.Message = $null; & $u.Action $u.Data } }
     }
@@ -212,7 +212,7 @@ function Update-TdTuiDailyToday {
 }
 
 function Add-TdTuiDailyFromText {
-    # « Vaisselle 10 @8h ; en semaine » : saisie rapide, puis les jours (tous par défaut).
+    # « Point d'équipe 15 @9h30 ; en semaine » : saisie rapide, puis les jours (tous par défaut).
     param([string]$Text)
     $parts = @($Text -split ';' | ForEach-Object { $_.Trim() })
     $parsed = ConvertFrom-TdQuickInput $parts[0]
@@ -253,7 +253,7 @@ function Invoke-TdTuiDailyKey {
         return
     }
     switch -CaseSensitive ($ch) {
-        'a' { Open-TdTuiPrompt -Label 'Nouvelle action' -Hint 'ex. Médicaments 2 @8h · Vaisselle 10 ; en semaine' -OnSubmit { param($text) Add-TdTuiDailyFromText -Text $text } }
+        'a' { Open-TdTuiPrompt -Label 'Nouvelle action' -Hint 'ex. E-mails 15 @9h · Saisie des temps 5 ; en semaine' -OnSubmit { param($text) Add-TdTuiDailyFromText -Text $text } }
         'q' { $tui.Mode = 'main' }
         'z' { if ($tui.Undo) { $u = $tui.Undo; $tui.Undo = $null; $tui.Message = $null; & $u.Action $u.Data } }
     }
@@ -351,7 +351,7 @@ function Get-TdTuiDailyFrame {
     $body.Add('  ' + (Format-TdTui -Text (Limit-TdTuiText -Text 'Ajoutées d''elles-mêmes les jours prévus, sans rien décider. Pas faites ? Elles reviennent, sans s''accumuler.' -Width ($Width - 4)) -Color 'muted'))
     $body.Add('')
     $daily = @($tui.Data.daily)
-    if ($daily.Count -eq 0) { $body.Add('    ' + (Format-TdTui -Text 'Aucune action. [a] pour ajouter : médicaments, vaisselle, courrier…' -Color 'muted')) }
+    if ($daily.Count -eq 0) { $body.Add('    ' + (Format-TdTui -Text 'Aucune action. [a] pour ajouter : e-mails, point d''équipe, saisie des temps…' -Color 'muted')) }
     $items = @(foreach ($a in $daily) {
             $mark = Format-TdTui -Text ([string][char]0x25CB) -Color 'muted'
             if ($a.active) { $mark = Format-TdTui -Text ([string][char]0x21BB) -Color 'success' }

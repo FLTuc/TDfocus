@@ -38,6 +38,9 @@ function Close-TdDrawer {
         Save-TdStateNow
     }
     $script:Td.Drawer = $null
+    $script:Td.EditingTemplateId = $null
+    $script:Td.TemplateDraft = $null
+    $script:Td.EditingDailyId = $null
     $script:Td.Ui.Drawer.Visibility = 'Collapsed'
     $script:Td.Ui.DrawerContent.Content = $null
 }
@@ -234,17 +237,25 @@ function Build-TdSoundsPanel {
 # ---------------------------------------------------------------- routines
 
 function Get-TdAllTemplates {
-    @(Get-TdBuiltInTemplates) + @($script:Td.Data.templates)
+    Get-TdTemplates $script:Td.Data.templates
+}
+
+function Save-TdTemplatesNow {
+    try { Save-TdTemplates $script:Td.Data.templates } catch { Write-TdLog "Sauvegarde des routines impossible : $($_.Exception.Message)" }
 }
 
 function Build-TdTemplatesPanel {
     param($Panel)
-    Add-TdSection $Panel 'Charger en un clic' 'Les tâches de la routine s''ajoutent à la fin de ta liste.'
+    Add-TdSection $Panel 'Charger en un clic' 'Les tâches de la routine s''ajoutent à la fin de ta liste. Le crayon permet de modifier chaque routine, y compris celles d''origine.'
     foreach ($tpl in (Get-TdAllTemplates)) {
+        if ($script:Td.EditingTemplateId -eq $tpl.id) {
+            [void]$Panel.Children.Add((New-TdTemplateEditor))
+            continue
+        }
         $total = 0.0
         foreach ($it in $tpl.items) { $total += [double]$it.minutes }
         $grid = New-Object System.Windows.Controls.Grid
-        foreach ($w in @('Auto', '*', 'Auto')) {
+        foreach ($w in @('Auto', '*', 'Auto', 'Auto')) {
             $col = New-Object System.Windows.Controls.ColumnDefinition
             if ($w -eq 'Auto') { $col.Width = [System.Windows.GridLength]::Auto }
             $grid.ColumnDefinitions.Add($col)
@@ -256,29 +267,42 @@ function Build-TdTemplatesPanel {
         [void]$texts.Children.Add((New-TdText -Text $tpl.name -Bold))
         $plural = ''
         if (@($tpl.items).Count -gt 1) { $plural = 's' }
-        [void]$texts.Children.Add((New-TdText -Text ('{0} tâche{1} · {2}' -f @($tpl.items).Count, $plural, (Format-TdMinutes $total)) -Size 12 -Brush 'MutedBrush'))
+        $meta = '{0} tâche{1} · {2}' -f @($tpl.items).Count, $plural, (Format-TdMinutes $total)
+        if ((Get-TdTemplateOrigin $tpl) -eq 'modified') { $meta += ' · modifiée' }
+        [void]$texts.Children.Add((New-TdText -Text $meta -Size 12 -Brush 'MutedBrush'))
         $texts.VerticalAlignment = 'Center'
         [System.Windows.Controls.Grid]::SetColumn($texts, 1)
         [void]$grid.Children.Add($texts)
-        if (-not $tpl.builtIn) {
-            $del = New-TdButton -Content ([string][char]0xE74D) -Style 'SmallIconButton' -ToolTip 'Supprimer cette routine' -Tag $tpl.id -OnClick {
-                param($s, $e)
-                $id = [string]$this.Tag
-                $list = $script:Td.Data.templates
-                for ($i = $list.Count - 1; $i -ge 0; $i--) { if ($list[$i].id -eq $id) { $list.RemoveAt($i) } }
-                Save-TdTemplates $list
-                Update-TdDrawer
-                $e.Handled = $true
-            }
-            [System.Windows.Controls.Grid]::SetColumn($del, 2)
-            [void]$grid.Children.Add($del)
+        $edit = New-TdButton -Content ([string][char]0xE70F) -Style 'SmallIconButton' -ToolTip 'Modifier cette routine' -Tag $tpl.id -OnClick {
+            param($s, $e)
+            Open-TdTemplateEditor -Id ([string]$this.Tag)
+            $e.Handled = $true
         }
+        [System.Windows.Controls.Grid]::SetColumn($edit, 2)
+        [void]$grid.Children.Add($edit)
+        $del = New-TdButton -Content ([string][char]0xE74D) -Style 'SmallIconButton' -ToolTip 'Supprimer cette routine' -Tag $tpl.id -OnClick {
+            param($s, $e)
+            Remove-TdTemplateNow -Id ([string]$this.Tag)
+            $e.Handled = $true
+        }
+        [System.Windows.Controls.Grid]::SetColumn($del, 3)
+        [void]$grid.Children.Add($del)
         $card = New-TdButton -Content $grid -Style 'CardButton' -Margin '0,0,0,8' -Tag $tpl.id -ToolTip (($tpl.items | ForEach-Object { '• {0} ({1})' -f $_.title, (Format-TdMinutes $_.minutes) }) -join "`n") -OnClick {
             $id = [string]$this.Tag
             $tpl = Get-TdAllTemplates | Where-Object { $_.id -eq $id } | Select-Object -First 1
             if ($tpl) { Add-TdTemplateNow $tpl }
         }
         [void]$Panel.Children.Add($card)
+    }
+    $hidden = Get-TdHiddenTemplateCount $script:Td.Data.templates
+    if ($hidden -gt 0) {
+        $restore = New-TdButton -Content ('Rétablir les routines d''origine supprimées ({0})' -f $hidden) -Style 'GhostButton' -Margin '0,0,0,8' -OnClick {
+            foreach ($t in @($script:Td.Data.templates | Where-Object { $_.hidden })) { [void](Reset-TdTemplate -UserTemplates $script:Td.Data.templates -Id $t.id) }
+            Save-TdTemplatesNow
+            Update-TdDrawer
+        }
+        $restore.HorizontalAlignment = 'Left'
+        [void]$Panel.Children.Add($restore)
     }
 
     $state = Get-TdState
@@ -310,8 +334,177 @@ function Save-TdCurrentAsTemplate {
     }
     $tpl = New-TdTemplateFromTasks -Name $name -Tasks @($state.tasks)
     $script:Td.Data.templates.Add($tpl)
-    Save-TdTemplates $script:Td.Data.templates
+    Save-TdTemplatesNow
     Show-TdToast -Text ('Routine « {0} » enregistrée.' -f $name)
+    Update-TdDrawer
+}
+
+function Remove-TdTemplateNow {
+    param([Parameter(Mandatory)][string]$Id)
+    $tpl = Get-TdAllTemplates | Where-Object { $_.id -eq $Id } | Select-Object -First 1
+    if (-not $tpl) { return }
+    $backup = @($script:Td.Data.templates | ForEach-Object { Copy-TdTemplate $_ })
+    Remove-TdTemplate -UserTemplates $script:Td.Data.templates -Id $Id
+    if ($script:Td.EditingTemplateId -eq $Id) { $script:Td.EditingTemplateId = $null }
+    Save-TdTemplatesNow
+    Update-TdDrawer
+    Show-TdToast -Text ('Routine « {0} » supprimée.' -f (Limit-TdText $tpl.name 30)) -ActionText 'Annuler' -Data @{ Backup = $backup } -Action {
+        param($d)
+        $list = $script:Td.Data.templates
+        $list.Clear()
+        foreach ($t in $d.Backup) { $list.Add($t) }
+        Save-TdTemplatesNow
+        Hide-TdToast
+        Update-TdDrawer
+    }
+}
+
+# ---------------------------------------------------------------- édition d'une routine
+
+function Open-TdTemplateEditor {
+    # Copie de travail : rien n'est enregistré avant « Enregistrer ».
+    param([Parameter(Mandatory)][string]$Id)
+    $tpl = Get-TdAllTemplates | Where-Object { $_.id -eq $Id } | Select-Object -First 1
+    if (-not $tpl) { return }
+    $items = [System.Collections.Generic.List[object]]::new()
+    foreach ($it in $tpl.items) {
+        $items.Add(@{ Title = [string]$it.title; Minutes = [string][int][Math]::Round([double]$it.minutes); Steps = (@($it.steps) -join ' ; '); CategoryId = $it.categoryId })
+    }
+    $script:Td.TemplateDraft = @{ Id = $tpl.id; Name = [string]$tpl.name; Items = $items; Refs = @(); NameBox = $null; Origin = (Get-TdTemplateOrigin $tpl) }
+    $script:Td.EditingTemplateId = $tpl.id
+    Update-TdDrawer
+}
+
+function Sync-TdTemplateDraft {
+    # Reprend ce qui a été tapé dans les champs avant de reconstruire l'éditeur.
+    $draft = $script:Td.TemplateDraft
+    if (-not $draft) { return }
+    if ($draft.NameBox) { $draft.Name = $draft.NameBox.Text }
+    for ($i = 0; $i -lt $draft.Refs.Count -and $i -lt $draft.Items.Count; $i++) {
+        $ref = $draft.Refs[$i]
+        $draft.Items[$i].Title = $ref.Title.Text
+        $draft.Items[$i].Minutes = $ref.Minutes.Text
+        $draft.Items[$i].Steps = $ref.Steps.Text
+    }
+}
+
+function New-TdTemplateEditor {
+    $draft = $script:Td.TemplateDraft
+    $card = New-TdCard -Padding '14'
+    $card.SetResourceReference([System.Windows.Controls.Border]::BorderBrushProperty, 'AccentBrush')
+    $card.BorderThickness = New-Object System.Windows.Thickness 1.5
+    $stack = New-TdPanel
+    [void]$stack.Children.Add((New-TdText -Text 'MODIFIER LA ROUTINE' -Size 11 -Brush 'AccentBrush' -Bold -Margin '0,0,0,6'))
+    $nameBox = New-TdTextBox -Text $draft.Name -Margin '0,0,0,10'
+    $nameBox.ToolTip = 'Nom de la routine'
+    $nameBox.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
+    $draft.NameBox = $nameBox
+    [void]$stack.Children.Add($nameBox)
+
+    $refs = @()
+    for ($i = 0; $i -lt $draft.Items.Count; $i++) {
+        $item = $draft.Items[$i]
+        $grid = New-Object System.Windows.Controls.Grid
+        $grid.Margin = New-Object System.Windows.Thickness 0, 0, 0, 8
+        foreach ($w in @('*', 'Auto', 'Auto', 'Auto', 'Auto')) {
+            $col = New-Object System.Windows.Controls.ColumnDefinition
+            if ($w -eq 'Auto') { $col.Width = [System.Windows.GridLength]::Auto }
+            $grid.ColumnDefinitions.Add($col)
+        }
+        foreach ($r in 0, 1) { $grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition)) }
+        $title = New-TdTextBox -Text $item.Title -Margin '0,0,6,4'
+        $title.ToolTip = 'Tâche'
+        $minutes = New-TdTextBox -Text $item.Minutes -Margin '0,0,6,4' -Width 54
+        $minutes.ToolTip = 'Durée en minutes'
+        $steps = New-TdTextBox -Text $item.Steps -Margin '0,0,6,0'
+        $steps.ToolTip = 'Sous-étapes, séparées par « ; » (facultatif)'
+        $steps.FontSize = 12
+        $steps.Padding = New-Object System.Windows.Thickness 10, 5, 10, 5
+        foreach ($box in @($title, $minutes, $steps)) { $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush') }
+        [System.Windows.Controls.Grid]::SetColumn($minutes, 1)
+        [System.Windows.Controls.Grid]::SetRow($steps, 1)
+        [System.Windows.Controls.Grid]::SetColumnSpan($steps, 2)
+        [void]$grid.Children.Add($title)
+        [void]$grid.Children.Add($minutes)
+        [void]$grid.Children.Add($steps)
+        $col = 2
+        foreach ($action in @(@([string][char]0xE74A, 'up', 'Monter'), @([string][char]0xE74B, 'down', 'Descendre'), @([string][char]0xE74D, 'remove', 'Retirer cette tâche'))) {
+            $button = New-TdButton -Content $action[0] -Style 'SmallIconButton' -ToolTip $action[2] -Tag ('{0}|{1}' -f $action[1], $i) -OnClick {
+                $p = ([string]$this.Tag).Split('|')
+                Step-TdTemplateDraft -Action $p[0] -Index ([int]$p[1])
+            }
+            $button.VerticalAlignment = 'Top'
+            [System.Windows.Controls.Grid]::SetColumn($button, $col)
+            [void]$grid.Children.Add($button)
+            $col++
+        }
+        [void]$stack.Children.Add($grid)
+        $refs += , @{ Title = $title; Minutes = $minutes; Steps = $steps }
+    }
+    $draft.Refs = $refs
+    $add = New-TdButton -Content ('+ Ajouter une tâche') -Style 'GhostButton' -Margin '0,0,0,10' -OnClick { Step-TdTemplateDraft -Action 'add' -Index 0 }
+    $add.HorizontalAlignment = 'Left'
+    [void]$stack.Children.Add($add)
+
+    $actions = New-TdPanel -Wrap
+    [void]$actions.Children.Add((New-TdButton -Content 'Enregistrer' -Style 'PrimaryButton' -Margin '0,0,6,4' -OnClick { Save-TdTemplateDraft }))
+    [void]$actions.Children.Add((New-TdButton -Content 'Annuler' -Margin '0,0,6,4' -OnClick {
+                $script:Td.EditingTemplateId = $null
+                $script:Td.TemplateDraft = $null
+                Update-TdDrawer
+            }))
+    if ($draft.Origin -eq 'modified') {
+        [void]$actions.Children.Add((New-TdButton -Content 'Rétablir l''original' -Style 'GhostButton' -Margin '0,0,0,4' -OnClick {
+                    [void](Reset-TdTemplate -UserTemplates $script:Td.Data.templates -Id $script:Td.TemplateDraft.Id)
+                    Save-TdTemplatesNow
+                    $script:Td.EditingTemplateId = $null
+                    $script:Td.TemplateDraft = $null
+                    Show-TdToast -Text 'Routine d''origine rétablie.'
+                    Update-TdDrawer
+                }))
+    }
+    [void]$stack.Children.Add($actions)
+    $card.Child = $stack
+    $card
+}
+
+function Step-TdTemplateDraft {
+    param([Parameter(Mandatory)][string]$Action, [int]$Index)
+    Sync-TdTemplateDraft
+    $items = $script:Td.TemplateDraft.Items
+    switch ($Action) {
+        'add' { $items.Add(@{ Title = ''; Minutes = '10'; Steps = ''; CategoryId = $null }) }
+        'remove' { if ($Index -lt $items.Count) { $items.RemoveAt($Index) } }
+        'up' { if ($Index -gt 0) { $it = $items[$Index]; $items.RemoveAt($Index); $items.Insert($Index - 1, $it) } }
+        'down' { if ($Index -lt $items.Count - 1) { $it = $items[$Index]; $items.RemoveAt($Index); $items.Insert($Index + 1, $it) } }
+    }
+    Update-TdDrawer
+}
+
+function Save-TdTemplateDraft {
+    Sync-TdTemplateDraft
+    $draft = $script:Td.TemplateDraft
+    $name = ([string]$draft.Name).Trim()
+    if (-not $name) { Show-TdToast -Text 'Donne un nom à ta routine.'; return }
+    $items = foreach ($it in $draft.Items) {
+        $title = ([string]$it.Title).Trim()
+        if (-not $title) { continue }
+        $minutes = 0.0
+        if (-not [double]::TryParse(([string]$it.Minutes).Trim(), [ref]$minutes) -or $minutes -lt 1) { $minutes = 10 }
+        $steps = @(([string]$it.Steps) -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        New-TdTemplateItem $title $minutes $it.CategoryId $steps
+    }
+    $items = @($items)
+    if ($items.Count -eq 0) { Show-TdToast -Text 'Garde au moins une tâche dans la routine.'; return }
+    $original = Get-TdAllTemplates | Where-Object { $_.id -eq $draft.Id } | Select-Object -First 1
+    $template = Copy-TdTemplate $original
+    $template.name = $name
+    $template.items = $items
+    [void](Set-TdTemplate -UserTemplates $script:Td.Data.templates -Template $template)
+    Save-TdTemplatesNow
+    $script:Td.EditingTemplateId = $null
+    $script:Td.TemplateDraft = $null
+    Show-TdToast -Text ('Routine « {0} » enregistrée.' -f (Limit-TdText $name 30))
     Update-TdDrawer
 }
 

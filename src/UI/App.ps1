@@ -61,6 +61,9 @@ function Initialize-TdApp {
         ProjectForm       = $null
         DailyBox          = $null
         NewDailyDays      = @(1, 2, 3, 4, 5, 6, 7)
+        EditingTemplateId = $null
+        TemplateDraft     = $null
+        EditingDailyId    = $null
         Timer             = $null
         Stopped           = $false
     }
@@ -669,7 +672,7 @@ function Update-TdFocusCard {
             $ui.EmptyText.Text = ("{0} tâche{1} terminée{1} aujourd'hui, {2} de concentration. Prends une vraie pause, tu l'as méritée." -f $state.done.Count, $plural, (Format-TdDurationMs $focusMs))
         }
         else {
-            $ui.EmptyEmoji.Text = [char]::ConvertFromUtf32(0x1F331)
+            $ui.EmptyEmoji.Text = [char]::ConvertFromUtf32(0x1F4CB)
             $ui.EmptyTitle.Text = "Qu'est-ce qui compte maintenant ?"
             $ui.EmptyText.Text = 'Ajoute une première tâche avec sa durée, ou charge une routine. Une seule chose à la fois.'
         }

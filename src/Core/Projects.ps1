@@ -85,7 +85,7 @@ function ConvertTo-TdProject {
     $block = [int](Get-TdValue $InputObject 'blockMinutes')
     if ($block -lt 5) { $block = 25 }
     $emoji = ConvertTo-TdNullableString (Get-TdValue $InputObject 'emoji')
-    if (-not $emoji) { $emoji = [char]::ConvertFromUtf32(0x1F331) }
+    if (-not $emoji) { $emoji = [char]::ConvertFromUtf32(0x1F4C1) }
     $deadline = ConvertTo-TdNullableString (Get-TdValue $InputObject 'deadline')
     if ($deadline -and $deadline -notmatch '^\d{4}-\d{2}-\d{2}$') { $deadline = $null }
     $invested = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'investedMs')
@@ -164,7 +164,7 @@ function Set-TdProjectStatus {
 }
 
 function Add-TdProjectStep {
-    # Un « pas » : la prochaine action concrète et courte (« ouvrir le devis », pas « la cuisine »).
+    # Un « pas » : la prochaine action concrète et courte (« ouvrir le cahier des charges », pas « le projet »).
     param([Parameter(Mandatory)]$Project, [Parameter(Mandatory)][string]$Title)
     $step = @(ConvertTo-TdSteps @($Title))[0]
     if (-not $step) { return $null }
@@ -409,4 +409,34 @@ function Sync-TdDailyTasks {
         $added++
     }
     $added
+}
+
+function ConvertTo-TdDailyActionText {
+    # Saisie rapide équivalente : « Point d'équipe 15 @09:30 ».
+    param([Parameter(Mandatory)]$Action)
+    $text = '{0} {1}' -f $Action.title, (Format-TdQuickMinutes $Action.minutes)
+    if ($Action.fixedStart) { $text += ' @' + $Action.fixedStart }
+    $text
+}
+
+function Set-TdDailyActionFromText {
+    # Modifie titre, durée et heure fixe d'une action du quotidien. Vrai si le texte est compris.
+    param([Parameter(Mandatory)]$Action, [string]$Text)
+    $parsed = ConvertFrom-TdQuickInput $Text
+    if (-not $parsed.title) { return $false }
+    $Action.title = $parsed.title
+    if ($parsed.minutes) { $Action.minutes = [double]$parsed.minutes }
+    $Action.fixedStart = $parsed.fixedStart
+    $true
+}
+
+function Update-TdDailyTaskToday {
+    # Répercute une modification sur la tâche du jour, si elle n'est pas encore commencée.
+    param([Parameter(Mandatory)]$State, [Parameter(Mandatory)]$Action)
+    foreach ($task in $State.tasks) {
+        if ($task.dailyId -ne $Action.id -or [long]$task.elapsedMs -gt 0 -or $null -ne $task.runningSince) { continue }
+        [void](Update-TdTask -State $State -Id $task.id -Changes @{ title = $Action.title; minutes = $Action.minutes; fixedStart = $Action.fixedStart })
+        return $true
+    }
+    $false
 }

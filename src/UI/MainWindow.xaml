@@ -428,7 +428,7 @@
 
               <!-- État vide / liste terminée -->
               <StackPanel x:Name="FocusEmpty" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,18">
-                <TextBlock x:Name="EmptyEmoji" Text="🌱" FontFamily="{StaticResource EmojiFont}" FontSize="40" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="EmptyEmoji" Text="📋" FontFamily="{StaticResource EmojiFont}" FontSize="40" HorizontalAlignment="Center"/>
                 <TextBlock x:Name="EmptyTitle" Text="Qu'est-ce qui compte maintenant ?" FontFamily="{StaticResource DisplayFont}" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,10,0,6" TextAlignment="Center" TextWrapping="Wrap"/>
                 <TextBlock x:Name="EmptyText" Text="Ajoute une première tâche avec sa durée, ou charge une routine. Une seule chose à la fois." Style="{StaticResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="460"/>
                 <Button x:Name="BtnEmptyTemplates" Style="{StaticResource PillButton}" Content="Charger une routine" HorizontalAlignment="Center" Margin="0,16,0,0"/>
