@@ -395,35 +395,47 @@ function New-TdTemplateEditor {
     $card.BorderThickness = New-Object System.Windows.Thickness 1.5
     $stack = New-TdPanel
     [void]$stack.Children.Add((New-TdText -Text 'MODIFIER LA ROUTINE' -Size 11 -Brush 'AccentBrush' -Bold -Margin '0,0,0,6'))
-    $nameBox = New-TdTextBox -Text $draft.Name -Margin '0,0,0,10'
+    $nameBox = New-TdTextBox -Text $draft.Name -Margin '0,0,0,12'
     $nameBox.ToolTip = 'Nom de la routine'
+    $nameBox.Padding = New-Object System.Windows.Thickness 10, 6, 10, 6
+    $nameBox.FontWeight = [System.Windows.FontWeights]::SemiBold
     $nameBox.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
     $draft.NameBox = $nameBox
     [void]$stack.Children.Add($nameBox)
 
     $refs = @()
     for ($i = 0; $i -lt $draft.Items.Count; $i++) {
+        # Ligne 1 : la tâche, sur toute la largeur. Ligne 2 : durée, sous-étapes, ordre.
         $item = $draft.Items[$i]
         $grid = New-Object System.Windows.Controls.Grid
-        $grid.Margin = New-Object System.Windows.Thickness 0, 0, 0, 8
-        foreach ($w in @('*', 'Auto', 'Auto', 'Auto', 'Auto')) {
+        $grid.Margin = New-Object System.Windows.Thickness 0, 0, 0, 12
+        foreach ($w in @('Auto', '*', 'Auto', 'Auto', 'Auto')) {
             $col = New-Object System.Windows.Controls.ColumnDefinition
             if ($w -eq 'Auto') { $col.Width = [System.Windows.GridLength]::Auto }
             $grid.ColumnDefinitions.Add($col)
         }
-        foreach ($r in 0, 1) { $grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition)) }
-        $title = New-TdTextBox -Text $item.Title -Margin '0,0,6,4'
+        foreach ($r in 0, 1) {
+            $row = New-Object System.Windows.Controls.RowDefinition
+            $row.Height = [System.Windows.GridLength]::Auto
+            $grid.RowDefinitions.Add($row)
+        }
+        $title = New-TdTextBox -Text $item.Title -Margin '0,0,0,4'
         $title.ToolTip = 'Tâche'
-        $minutes = New-TdTextBox -Text $item.Minutes -Margin '0,0,6,4' -Width 54
+        $minutes = New-TdTextBox -Text $item.Minutes -Margin '0,0,4,0' -Width 52
         $minutes.ToolTip = 'Durée en minutes'
-        $steps = New-TdTextBox -Text $item.Steps -Margin '0,0,6,0'
+        $minutes.TextAlignment = [System.Windows.TextAlignment]::Center
+        $steps = New-TdTextBox -Text $item.Steps -Margin '0,0,2,0'
         $steps.ToolTip = 'Sous-étapes, séparées par « ; » (facultatif)'
+        foreach ($box in @($title, $minutes, $steps)) {
+            $box.Padding = New-Object System.Windows.Thickness 8, 5, 8, 5
+            $box.FontSize = 13
+            $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush')
+        }
         $steps.FontSize = 12
-        $steps.Padding = New-Object System.Windows.Thickness 10, 5, 10, 5
-        foreach ($box in @($title, $minutes, $steps)) { $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush') }
-        [System.Windows.Controls.Grid]::SetColumn($minutes, 1)
+        [System.Windows.Controls.Grid]::SetColumnSpan($title, 5)
+        [System.Windows.Controls.Grid]::SetRow($minutes, 1)
         [System.Windows.Controls.Grid]::SetRow($steps, 1)
-        [System.Windows.Controls.Grid]::SetColumnSpan($steps, 2)
+        [System.Windows.Controls.Grid]::SetColumn($steps, 1)
         [void]$grid.Children.Add($title)
         [void]$grid.Children.Add($minutes)
         [void]$grid.Children.Add($steps)
@@ -433,7 +445,9 @@ function New-TdTemplateEditor {
                 $p = ([string]$this.Tag).Split('|')
                 Step-TdTemplateDraft -Action $p[0] -Index ([int]$p[1])
             }
-            $button.VerticalAlignment = 'Top'
+            $button.Width = 26
+            $button.Height = 26
+            [System.Windows.Controls.Grid]::SetRow($button, 1)
             [System.Windows.Controls.Grid]::SetColumn($button, $col)
             [void]$grid.Children.Add($button)
             $col++
@@ -441,6 +455,7 @@ function New-TdTemplateEditor {
         [void]$stack.Children.Add($grid)
         $refs += , @{ Title = $title; Minutes = $minutes; Steps = $steps }
     }
+    [void]$stack.Children.Add((New-TdText -Text 'Durée en minutes · sous-étapes séparées par « ; »' -Size 11 -Brush 'MutedBrush' -Margin '2,0,0,6'))
     $draft.Refs = $refs
     $add = New-TdButton -Content ('+ Ajouter une tâche') -Style 'GhostButton' -Margin '0,0,0,10' -OnClick { Step-TdTemplateDraft -Action 'add' -Index 0 }
     $add.HorizontalAlignment = 'Left'
