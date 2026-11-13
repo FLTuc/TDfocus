@@ -1049,6 +1049,23 @@ function Build-TdSettingsPanel {
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Bulle Cockpit toujours au-dessus des autres fenêtres' -Checked ([bool]$settings.cockpit.enabled) -ToolTip 'Petite bulle flottante pour le helpdesk et les projets. Un clic l''ouvre, on la déplace en la faisant glisser.' -OnChange {
                 if ($this.IsChecked) { Show-TdCockpit } else { Hide-TdCockpit }
             }))
+    # Cockpit : durée avant l'alerte douce d'un ticket (30 min par défaut).
+    $alertRow = New-Object System.Windows.Controls.StackPanel
+    $alertRow.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+    $alertRow.Margin = New-Object System.Windows.Thickness 2, 0, 0, 8
+    $alertText = New-TdText -Text 'Cockpit : alerte douce quand un ticket dépasse' -Size 13
+    $alertText.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    [void]$alertRow.Children.Add($alertText)
+    $alertBox = New-TdTextBox -Text ([string]$settings.cockpit.ticketAlertMinutes) -Margin '8,0,6,0' -Width 52
+    $alertBox.TextAlignment = [System.Windows.TextAlignment]::Center
+    $alertBox.ToolTip = 'De 1 à 240 minutes'
+    $alertBox.Add_LostFocus({ Set-TdTicketAlertMinutes -Box $this })
+    $alertBox.Add_KeyDown({ param($s, $e) if ($e.Key -eq [System.Windows.Input.Key]::Return) { Set-TdTicketAlertMinutes -Box $s } })
+    [void]$alertRow.Children.Add($alertBox)
+    $alertUnit = New-TdText -Text 'min' -Size 13
+    $alertUnit.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    [void]$alertRow.Children.Add($alertUnit)
+    [void]$Panel.Children.Add($alertRow)
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Mode compact toujours au premier plan' -Checked $settings.compactTopmost -OnChange {
                 (Get-TdSettings).compactTopmost = [bool]$this.IsChecked
                 Save-TdSettingsNow
@@ -1161,6 +1178,21 @@ function Update-TdCategoryField {
     Update-TdView
 }
 
+function Set-TdTicketAlertMinutes {
+    # Réglages : durée (en minutes) avant l'alerte d'un ticket. Une valeur illisible est refusée.
+    param([Parameter(Mandatory)]$Box)
+    $cockpit = (Get-TdSettings).cockpit
+    $minutes = 0
+    if ([int]::TryParse(([string]$Box.Text).Trim(), [ref]$minutes) -and $minutes -ge 1 -and $minutes -le 240) {
+        if ($minutes -ne [int]$cockpit.ticketAlertMinutes) {
+            $cockpit.ticketAlertMinutes = $minutes
+            Save-TdSettingsNow
+            Update-TdCockpit -NowMs (Get-TdNowMs) -Force
+        }
+    }
+    $Box.Text = [string]$cockpit.ticketAlertMinutes
+}
+
 function Export-TdBackupNow {
     $dialog = New-Object Microsoft.Win32.SaveFileDialog
     $dialog.Filter = 'Sauvegarde TDfocus (*.json)|*.json'
@@ -1192,6 +1224,8 @@ function Import-TdBackupNow {
         Save-TdCheckIns $restored.checkins
         Save-TdProjects $restored.projects
         Save-TdDaily $restored.daily
+        Save-TdTickets $restored.tickets
+        Update-TdCockpit -NowMs $now -Force
         Update-TdThemeNow
         Build-TdAddBarChips
         Set-TdAmbient -Name $restored.settings.ambient -Volume $restored.settings.ambientVolume

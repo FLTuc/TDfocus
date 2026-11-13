@@ -79,6 +79,11 @@ function Initialize-TdApp {
     $now = Get-TdNowMs
     $state = $script:Td.Data.state
     $paused = Repair-TdStaleTimer -State $state -NowMs $now
+    # Tickets du cockpit : même précaution pour leur chrono, et on oublie les très vieux tickets fermés.
+    $tickets = $script:Td.Data.tickets
+    $ticketPaused = Repair-TdStaleTicket -Store $tickets -LastSeenMs ([long]$state.lastSeenMs) -NowMs $now
+    $ticketsRemoved = Limit-TdTickets -Store $tickets -NowMs $now
+    if ($null -ne $ticketPaused -or $ticketsRemoved -gt 0) { Save-TdTickets $tickets }
     [void](Invoke-TdDayRollover -State $state -NowMs $now)
     $dailyAdded = Sync-TdDailyTasks -State $state -Daily $script:Td.Data.daily -NowMs $now
     Sync-TdState $state $now

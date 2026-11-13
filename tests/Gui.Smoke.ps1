@@ -448,6 +448,150 @@ function Invoke-TdSmokeTest {
     Assert-Td (-not $ck.Bubble.IsVisible -and -not $ck.Panel.IsVisible -and -not $script:Td.Data.settings.cockpit.enabled) '« masquer la bulle »'
     Show-TdCockpit -Open
     Assert-Td ($ck.Panel.IsVisible -and $script:Td.Data.settings.cockpit.enabled) 'cockpit rouvert depuis le menu'
+
+    # Cockpit, étape 2 : tickets (ajout, chrono, alerte, fermer, escalader, listes, annuler, bulle)
+    $pe = $ck.PanelEls
+    $tickets = $script:Td.Data.tickets
+    Wait-TdUi 200
+    Assert-Td ($pe.NoTicketText.IsVisible -and -not $pe.CurrentBox.IsVisible -and $pe.TileOpenCount.Text -eq '0' -and -not $pe.AddForm.IsVisible) 'carte Tickets vide au départ'
+    foreach ($control in @($pe.BtnAddTicket, $pe.TileOpen, $pe.TileClosed, $pe.TileWaiting)) {
+        Assert-Td ($control.ActualWidth -ge 44 -and $control.ActualHeight -ge 44) "bouton d'au moins 44 px ($($control.Name) : $([int]$control.ActualWidth) x $([int]$control.ActualHeight))"
+    }
+    # « + Ticket », saisie, touche Entrée
+    Invoke-TdClick $pe.BtnAddTicket
+    Assert-Td ($pe.AddForm.IsVisible -and $pe.TicketBoxHint.IsVisible) 'formulaire d''ajout ouvert'
+    $pe.TicketBox.Text = 'INC-4821 · VPN impossible (compta)'
+    Wait-TdUi 80
+    Assert-Td (-not $pe.TicketBoxHint.IsVisible) 'l''indication disparaît dès qu''on écrit'
+    $source = [System.Windows.PresentationSource]::FromVisual($pe.TicketBox)
+    $keyArgs = New-Object System.Windows.Input.KeyEventArgs ([System.Windows.Input.Keyboard]::PrimaryDevice), $source, 0, ([System.Windows.Input.Key]::Return)
+    $keyArgs.RoutedEvent = [System.Windows.Input.Keyboard]::KeyDownEvent
+    $pe.TicketBox.RaiseEvent($keyArgs)
+    Wait-TdUi 120
+    Assert-Td ($tickets.items.Count -eq 1 -and $pe.TileOpenCount.Text -eq '1' -and -not $pe.AddForm.IsVisible) 'ticket ajouté avec Entrée : tuile « ouverts » à 1'
+    Assert-Td ($pe.CurrentBox.IsVisible -and $pe.CurrentRef.Text -eq 'INC-4821 · VPN impossible (compta)' -and $pe.BtnTicketToggle.Content -eq 'Démarrer' -and $pe.CurrentChrono.Text -eq '00:00') 'il devient le ticket en cours, chrono à l''arrêt'
+    # Deuxième ticket, urgent, par le bouton « Ajouter »
+    Invoke-TdClick $pe.BtnAddTicket
+    $pe.TicketBox.Text = 'INC-4830 Imprimante RH'
+    Invoke-TdClick $pe.TicketUrgent
+    Invoke-TdClick $pe.BtnAddConfirm
+    Assert-Td ($pe.TileOpenCount.Text -eq '2' -and $pe.TileOpenUrgent.Text -like '*1 urgent' -and $pe.CurrentRef.Text -like 'INC-4821*') 'deuxième ticket urgent : 2 ouverts dont 1 urgent, le ticket en cours ne change pas'
+    # Troisième ticket sans libellé, puis « Annuler »
+    Invoke-TdClick $pe.BtnAddTicket
+    Invoke-TdClick $pe.BtnAddConfirm
+    Assert-Td ($tickets.items.Count -eq 3 -and $pe.TicketMessage.IsVisible -and $pe.TicketMessageText.Text -match '^Ajouté : Ticket de \d{2}:\d{2}$' -and $pe.BtnTicketUndo.IsVisible) 'ticket sans libellé : nommé par son heure, message avec « Annuler »'
+    Invoke-TdClick $pe.BtnTicketUndo
+    Assert-Td ($tickets.items.Count -eq 2 -and $pe.TileOpenCount.Text -eq '2' -and -not $pe.BtnTicketUndo.IsVisible) '« Annuler » retire le ticket ajouté par erreur'
+
+    # Démarrer : le chrono du ticket tourne, la tâche TDfocus se met en pause (un seul chrono à la fois)
+    if (-not (Get-TdCurrentTask $state)) { [void](Add-TdTask -State $state -Task (New-TdTask -Title 'Suivi des demandes' -Minutes 20)) }
+    Start-TdTimer $state ((Get-TdNowMs) - 5000)
+    Assert-Td (Test-TdRunning $state) 'une tâche TDfocus tourne'
+    Invoke-TdClick $pe.BtnTicketToggle
+    Wait-TdUi 400
+    Assert-Td ((Test-TdTicketRunning $tickets) -and -not (Test-TdRunning $state) -and $pe.BtnTicketToggle.Content -eq 'Pause') '« Démarrer » : le chrono du ticket tourne, la tâche TDfocus est mise en pause'
+    Assert-Td ($null -ne (Get-TdCurrentTask $state).pausedAt -and $pe.TicketMessageText.Text -like 'Tâche TDfocus mise en pause*') 'la pause de la tâche est annoncée'
+    # 18 min 24 plus tard
+    $current = Get-TdCurrentTicket $tickets
+    $current.runningSince = (Get-TdNowMs) - (18 * 60 + 24) * 1000
+    Update-TdCockpit -NowMs (Get-TdNowMs) -Force
+    Wait-TdUi 150
+    Assert-Td ($pe.CurrentChrono.Text -match '^18:2\d$' -and $pe.CurrentLimit.Text -eq 'sur 30 min') "chrono du ticket ($($pe.CurrentChrono.Text) $($pe.CurrentLimit.Text))"
+    Assert-Td ($pe.BarDone.Width.Value -gt 0.6 -and $pe.BarDone.Width.Value -lt 0.63 -and -not $pe.CurrentAlert.IsVisible) 'barre de progression vers 30 min (61 %)'
+    foreach ($control in @($pe.BtnTicketToggle, $pe.BtnTicketEscalate, $pe.BtnTicketClose)) {
+        Assert-Td ($control.ActualHeight -ge 44 -and $control.ActualWidth -ge 100) "bouton « $($control.Content) » : $([int]$control.ActualWidth) x $([int]$control.ActualHeight) px"
+    }
+    Hide-TdTicketMessage
+    Save-TdScreenshot '26-cockpit-tickets' -Window $ck.Panel
+    # Le temps passe en vrai : le chrono avance tout seul
+    $before = $pe.CurrentChrono.Text
+    Wait-TdUi 1300
+    Assert-Td ($pe.CurrentChrono.Text -ne $before) "le chrono avance ($before -> $($pe.CurrentChrono.Text))"
+    # Alerte douce à 30 min : couleur et phrase fixes, une seule fois
+    $current.runningSince = (Get-TdNowMs) - 31 * 60000
+    Wait-TdUi 700
+    Assert-Td ($null -ne $current.alertedAt -and $pe.CurrentAlert.IsVisible -and $pe.CurrentAlert.Text -like '30 min dépassées*') 'alerte à 30 min affichée'
+    Assert-Td ($pe.BarDone.Width.Value -eq 1 -and $pe.BarFill.Background.Color.ToString() -eq '#FFF28B82') 'barre pleine, en couleur d''alerte'
+    $alertedAt = $current.alertedAt
+    Wait-TdUi 600
+    Assert-Td ($current.alertedAt -eq $alertedAt) 'l''alerte n''est donnée qu''une fois'
+    Save-TdScreenshot '27-cockpit-alerte' -Window $ck.Panel
+    # Réglage de la limite (Réglages > Confort)
+    $box = New-Object System.Windows.Controls.TextBox
+    $box.Text = '45'
+    Set-TdTicketAlertMinutes -Box $box
+    Assert-Td ($script:Td.Data.settings.cockpit.ticketAlertMinutes -eq 45 -and $pe.CurrentLimit.Text -eq 'sur 45 min' -and -not $pe.CurrentAlert.IsVisible) 'limite réglée à 45 min : le cockpit suit'
+    $box.Text = 'abc'
+    Set-TdTicketAlertMinutes -Box $box
+    Assert-Td ($box.Text -eq '45' -and $script:Td.Data.settings.cockpit.ticketAlertMinutes -eq 45) 'valeur illisible refusée'
+    $box.Text = '30'
+    Set-TdTicketAlertMinutes -Box $box
+    # Pause, puis Fermer
+    Invoke-TdClick $pe.BtnTicketToggle
+    Assert-Td (-not (Test-TdTicketRunning $tickets) -and $pe.BtnTicketToggle.Content -eq 'Reprendre' -and $pe.CurrentLimit.Text -like '*en pause') '« Pause » : chrono arrêté, bouton « Reprendre »'
+    Invoke-TdClick $pe.BtnTicketClose
+    Assert-Td ($pe.TileClosedCount.Text -eq '1' -and $pe.TileOpenCount.Text -eq '1' -and $pe.CurrentRef.Text -eq 'INC-4830 Imprimante RH' -and $pe.CurrentUrgent.IsVisible) '« Fermer » : 1 fermé aujourd''hui, le ticket urgent devient le ticket en cours'
+    Assert-Td ($pe.TicketMessageText.Text -like 'Fermé : INC-4821*' -and $pe.BtnTicketUndo.IsVisible) 'message « Fermé » avec « Annuler »'
+    Invoke-TdClick $pe.BtnTicketUndo
+    Assert-Td ($pe.TileClosedCount.Text -eq '0' -and $pe.TileOpenCount.Text -eq '2' -and $pe.CurrentRef.Text -like 'INC-4821*') '« Annuler » rouvre le ticket et le remet en cours'
+    Invoke-TdClick $pe.BtnTicketClose
+    Assert-Td ($pe.TileClosedCount.Text -eq '1' -and $current.status -eq 'closed' -and $current.elapsedMs -ge 31 * 60000) 'ticket fermé, temps passé conservé'
+    # Escalader : le ticket passe dans « à relancer »
+    Invoke-TdClick $pe.BtnTicketEscalate
+    Assert-Td ($pe.TileOpenCount.Text -eq '0' -and $pe.TileWaitingCount.Text -eq '1' -and $pe.NoTicketText.IsVisible -and -not $pe.TileWaitingDot.IsVisible) '« Escalader » : 0 ouvert, 1 à relancer (relance pas encore due)'
+    Assert-Td ($pe.TicketMessageText.Text -like 'Escaladé : INC-4830*') "message d'escalade ($($pe.TicketMessageText.Text))"
+    # Listes des tuiles
+    Invoke-TdClick $pe.TileWaiting
+    Assert-Td ($pe.TicketListBox.IsVisible -and $pe.TicketListTitle.Text -eq 'À RELANCER' -and $pe.TicketList.Children.Count -eq 1) 'clic sur la tuile « à relancer » : sa liste s''ouvre'
+    $waiting = @(Get-TdTicketList -Store $tickets -Kind waiting)
+    $waiting[0].followUpOn = Get-TdDayKey (Get-TdNowMs)
+    Update-TdCockpit -NowMs (Get-TdNowMs) -Force
+    Assert-Td ($pe.TileWaitingDot.IsVisible -and $ck.BubbleEls.BubbleDot.Visibility -eq 'Visible') 'relance due aujourd''hui : pastille orange sur la tuile et sur la bulle'
+    Invoke-TdClick $pe.BtnAddTicket
+    $pe.TicketBox.Text = 'INC-4835 Accès dossier partagé'
+    Invoke-TdClick $pe.BtnAddConfirm
+    Hide-TdTicketMessage
+    Save-TdScreenshot '28-cockpit-relances' -Window $ck.Panel
+    Invoke-TdClick (Find-TdDescendant $pe.TicketList { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Relancé' })
+    Assert-Td ($waiting[0].followUpOn -gt (Get-TdDayKey (Get-TdNowMs)) -and -not $pe.TileWaitingDot.IsVisible -and $ck.BubbleEls.BubbleDot.Visibility -ne 'Visible') '« Relancé » : relance repoussée, la pastille disparaît'
+    Invoke-TdClick (Find-TdDescendant $pe.TicketList { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Reprendre' })
+    Wait-TdUi 300
+    Assert-Td ($pe.TileWaitingCount.Text -eq '0' -and $pe.CurrentRef.Text -eq 'INC-4830 Imprimante RH' -and (Test-TdTicketRunning $tickets)) '« Reprendre » : le ticket escaladé redevient le ticket en cours, chrono en marche'
+    Invoke-TdClick $pe.TileOpen
+    Assert-Td ($pe.TicketListTitle.Text -eq 'OUVERTS' -and $pe.TicketList.Children.Count -eq 2) 'tuile « ouverts » : 2 tickets listés'
+    Invoke-TdClick (Find-TdDescendant $pe.TicketList { param($n) $n -is [System.Windows.Controls.Button] -and $n.Content -eq 'Traiter' })
+    Wait-TdUi 300
+    Assert-Td ($pe.CurrentRef.Text -eq 'INC-4835 Accès dossier partagé' -and (Test-TdTicketRunning $tickets) -and $null -eq (Find-TdTicket $tickets $waiting[0].id).runningSince) '« Traiter » : on change de ticket, un seul chrono tourne'
+    Invoke-TdClick (Find-TdDescendant $pe.TicketList { param($n) $n -is [System.Windows.Controls.Button] -and "$($n.ToolTip)" -like 'Supprimer*' })
+    Assert-Td ($tickets.items.Count -eq 2 -and $pe.TicketMessageText.Text -like 'Supprimé :*') 'ticket supprimé (saisi par erreur)'
+    Invoke-TdClick $pe.BtnTicketUndo
+    Assert-Td ($tickets.items.Count -eq 3) 'suppression annulée'
+    Invoke-TdClick $pe.TileClosed
+    Assert-Td ($pe.TicketListTitle.Text -eq "FERMÉS AUJOURD'HUI" -and $pe.TicketList.Children.Count -eq 1) 'tuile « fermés aujourd''hui » : 1 ticket listé'
+    Invoke-TdClick $pe.TileClosed
+    Assert-Td (-not $pe.TicketListBox.IsVisible) 'second clic sur la tuile : la liste se referme'
+    # Reprise d'une tâche TDfocus : c'est le ticket qui se met en pause
+    Assert-Td (Test-TdTicketRunning $tickets) 'un chrono de ticket tourne'
+    Start-TdTimer $state (Get-TdNowMs)
+    Wait-TdUi 500
+    Assert-Td ((Test-TdRunning $state) -and -not (Test-TdTicketRunning $tickets)) 'la tâche TDfocus redémarre : le ticket se met en pause'
+    Suspend-TdTimer $state (Get-TdNowMs)
+    # La bulle : nombre de tickets fermés aujourd'hui, contour bleu quand un chrono de ticket tourne
+    Invoke-TdClick $pe.BtnTicketToggle
+    Invoke-TdClick $pe.BtnReduce
+    Wait-TdUi 200
+    Assert-Td ($ck.Bubble.IsVisible -and $ck.BubbleEls.BubbleCount.Text -eq '1' -and $ck.BubbleEls.BubbleLabel.Text -eq 'fermé') 'la bulle affiche le nombre de tickets fermés aujourd''hui'
+    Assert-Td ($ck.BubbleEls.BubbleButton.BorderBrush.Color.ToString() -eq '#FF5B9BF0') 'contour de la bulle bleu : un chrono de ticket tourne'
+    (Find-TdTicket $tickets $waiting[0].id).status = 'escalated'
+    (Find-TdTicket $tickets $waiting[0].id).followUpOn = Get-TdDayKey (Get-TdNowMs)
+    Update-TdCockpit -NowMs (Get-TdNowMs) -Force
+    Save-TdScreenshot '29-cockpit-bulle-tickets' -Window $ck.Bubble
+    # Tout est relu depuis tickets.json
+    Suspend-TdTicket -Store $tickets -NowMs (Get-TdNowMs)
+    Save-TdTicketsNow
+    $savedTickets = (Import-TdData).tickets
+    $savedCounts = Get-TdTicketCounts -Store $savedTickets
+    Assert-Td ($savedTickets.items.Count -eq 3 -and $savedCounts.closedToday -eq 1 -and $savedCounts.waiting -eq 1 -and $savedCounts.open -eq 1) 'tickets relus depuis le disque (1 ouvert, 1 fermé, 1 à relancer)'
     Hide-TdCockpit
     Assert-Td ($w.IsVisible -and $ui.MainRoot.Visibility -eq 'Visible') 'la fenêtre principale n''est pas affectée par le cockpit'
 

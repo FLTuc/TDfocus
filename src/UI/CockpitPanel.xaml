@@ -18,6 +18,7 @@
     <SolidColorBrush x:Key="CkAlert" Color="#F28B82"/>
     <SolidColorBrush x:Key="CkLine" Color="#2A2D35"/>
     <SolidColorBrush x:Key="CkButtonBg" Color="#2A2E37"/>
+    <SolidColorBrush x:Key="CkRing" Color="#3A3F4A"/>
 
     <!-- Bouton : au moins 44 px, coins arrondis, contour visible au survol et au clavier. -->
     <Style x:Key="CkButton" TargetType="Button">
@@ -40,10 +41,101 @@
                 <Setter TargetName="Bd" Property="BorderBrush" Value="#3A3F4A"/>
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter TargetName="Bd" Property="BorderBrush" Value="#5B9BF0"/>
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#E8EAED"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Opacity" Value="0.5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Tuile : un vrai bouton, sur le fond du cockpit. Son contour montre la tuile dont la liste est ouverte. -->
+    <Style x:Key="CkTile" TargetType="Button">
+      <Setter Property="MinHeight" Value="64"/>
+      <Setter Property="Background" Value="{StaticResource CkBg}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource CkText}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12" BorderThickness="2" BorderBrush="{TemplateBinding BorderBrush}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A3F4A"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#E8EAED"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Champ de saisie sombre : 44 px de haut, contour bleu quand on écrit dedans. -->
+    <Style x:Key="CkField" TargetType="TextBox">
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Background" Value="{StaticResource CkBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource CkText}"/>
+      <Setter Property="CaretBrush" Value="{StaticResource CkText}"/>
+      <Setter Property="SelectionBrush" Value="{StaticResource CkTickets}"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12" BorderThickness="2" BorderBrush="#3A3F4A">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#5B9BF0"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Bascule « Urgent » : une coche et la couleur d'alerte quand elle est activée. -->
+    <Style x:Key="CkToggle" TargetType="ToggleButton">
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="MinWidth" Value="44"/>
+      <Setter Property="Background" Value="{StaticResource CkButtonBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource CkText}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12" BorderThickness="2" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}">
+                <Path x:Name="Check" Data="M 0 5 L 4 9 L 11 1" Stroke="#16181D" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round" VerticalAlignment="Center" Margin="0,0,7,0" Visibility="Collapsed"/>
+                <ContentPresenter VerticalAlignment="Center"/>
+              </StackPanel>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Background" Value="{StaticResource CkAlert}"/>
+                <Setter Property="Foreground" Value="#16181D"/>
+                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A3F4A"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#E8EAED"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -120,14 +212,139 @@
       <!-- Le reste défile si l'écran est trop petit pour 860 px de haut. -->
       <ScrollViewer Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
         <StackPanel x:Name="Body">
-          <!-- Étape 1 : message provisoire. Il sera remplacé par la jauge, les tickets et les projets. -->
-          <Border x:Name="PlaceholderCard" Style="{StaticResource CkCardBox}">
+          <!-- 3. Tickets : ajout, trois tuiles, ticket en cours avec son chrono, listes. -->
+          <Border x:Name="TicketsCard" Style="{StaticResource CkCardBox}">
             <StackPanel>
-              <TextBlock Text="COCKPIT" Style="{StaticResource CkTitle}"/>
-              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CkText}" FontSize="15" FontWeight="SemiBold"
-                         Text="La bulle et cette fenêtre sont en place."/>
-              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CkMuted}" Margin="0,6,0,0"
-                         Text="Les tickets, la jauge « Équilibre du jour », les projets et les relances arrivent aux étapes suivantes."/>
+              <Grid Margin="0,0,0,8">
+                <TextBlock Text="TICKETS" Style="{StaticResource CkTitle}" Margin="0" VerticalAlignment="Center"/>
+                <Button x:Name="BtnAddTicket" Style="{StaticResource CkButton}" HorizontalAlignment="Right" Content="+ Ticket"
+                        ToolTip="Ajouter un ticket" AutomationProperties.Name="Ajouter un ticket"/>
+              </Grid>
+
+              <!-- Formulaire d'ajout : replié tant qu'on n'a pas cliqué « + Ticket ». -->
+              <StackPanel x:Name="AddForm" Visibility="Collapsed" Margin="0,0,0,10">
+                <Grid>
+                  <TextBox x:Name="TicketBox" Style="{StaticResource CkField}" MaxLength="80" AutomationProperties.Name="Numéro ou sujet du ticket"/>
+                  <TextBlock x:Name="TicketBoxHint" Text="N° ou sujet (facultatif), puis Entrée" Foreground="{StaticResource CkMuted}"
+                             Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                </Grid>
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <ToggleButton x:Name="TicketUrgent" Style="{StaticResource CkToggle}" Content="Urgent" ToolTip="Ce ticket passera avant les autres"/>
+                  <Button x:Name="BtnAddCancel" Grid.Column="2" Style="{StaticResource CkButton}" Content="Annuler" Margin="0,0,8,0"/>
+                  <Button x:Name="BtnAddConfirm" Grid.Column="3" Style="{StaticResource CkButton}" Content="Ajouter"
+                          Background="{StaticResource CkTickets}" Foreground="#16181D"/>
+                </Grid>
+              </StackPanel>
+
+              <!-- Trois tuiles. Un clic sur une tuile ouvre (ou referme) la liste de ses tickets. -->
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="TileOpen" Style="{StaticResource CkTile}" ToolTip="Tickets ouverts : cliquer pour voir la liste">
+                  <StackPanel>
+                    <TextBlock x:Name="TileOpenCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
+                               LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"><Run Text="ouverts"/><Run x:Name="TileOpenUrgent" Text="" Foreground="{StaticResource CkAlert}"/></TextBlock>
+                  </StackPanel>
+                </Button>
+                <Button x:Name="TileClosed" Grid.Column="2" Style="{StaticResource CkTile}" ToolTip="Tickets fermés aujourd'hui : cliquer pour voir la liste">
+                  <StackPanel>
+                    <TextBlock x:Name="TileClosedCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
+                               LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
+                    <TextBlock Text="fermés aujourd'hui" FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Button>
+                <Grid Grid.Column="4">
+                  <Button x:Name="TileWaiting" Style="{StaticResource CkTile}"
+                          ToolTip="Tickets escaladés, en attente de quelqu'un. Pastille orange : une relance est à faire aujourd'hui.">
+                    <StackPanel>
+                      <TextBlock x:Name="TileWaitingCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
+                                 LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
+                      <TextBlock Text="à relancer" FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <!-- Même pastille que sur la bulle : une relance est due. -->
+                  <Ellipse x:Name="TileWaitingDot" Width="10" Height="10" Fill="{StaticResource CkProjects}" HorizontalAlignment="Right"
+                           VerticalAlignment="Top" Margin="0,8,8,0" Visibility="Collapsed" IsHitTestVisible="False"/>
+                </Grid>
+              </Grid>
+
+              <!-- Liste des tickets de la tuile choisie (remplie par le code). -->
+              <Border x:Name="TicketListBox" Visibility="Collapsed" Background="{StaticResource CkBg}" CornerRadius="12" Padding="12,10" Margin="0,8,0,0">
+                <StackPanel>
+                  <TextBlock x:Name="TicketListTitle" Text="" Style="{StaticResource CkTitle}" Margin="0"/>
+                  <StackPanel x:Name="TicketList"/>
+                </StackPanel>
+              </Border>
+
+              <!-- Ticket en cours : libellé, chrono, barre vers la limite, trois boutons. -->
+              <StackPanel x:Name="CurrentBox" Margin="0,12,0,0" Visibility="Collapsed">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="CurrentRef" Text="" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <Border x:Name="CurrentUrgent" Grid.Column="1" Background="{StaticResource CkAlert}" CornerRadius="6" Padding="7,2" Margin="8,0,0,0"
+                          VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock Text="URGENT" FontSize="10" FontWeight="Bold" Foreground="#16181D"/>
+                  </Border>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                  <TextBlock x:Name="CurrentChrono" Text="00:00" FontSize="28" LineHeight="34" LineStackingStrategy="BlockLineHeight"/>
+                  <TextBlock x:Name="CurrentLimit" Text="sur 30 min" Foreground="{StaticResource CkMuted}" Margin="10,0,0,5" VerticalAlignment="Bottom"/>
+                </StackPanel>
+                <!-- Barre de progression : deux colonnes dont le code règle les proportions. -->
+                <Grid Height="6" Margin="0,6,0,0">
+                  <Border Background="{StaticResource CkLine}" CornerRadius="3"/>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition x:Name="BarDone" Width="0*"/>
+                      <ColumnDefinition x:Name="BarLeft" Width="1*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="BarFill" Background="{StaticResource CkTickets}" CornerRadius="3"/>
+                  </Grid>
+                </Grid>
+                <!-- Alerte fixe (pas de clignotement) quand la limite est dépassée. -->
+                <TextBlock x:Name="CurrentAlert" Text="" Foreground="{StaticResource CkAlert}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
+                <Grid Margin="0,10,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Button x:Name="BtnTicketToggle" Style="{StaticResource CkButton}" Content="Démarrer" Padding="4,0"/>
+                  <Button x:Name="BtnTicketEscalate" Grid.Column="2" Style="{StaticResource CkButton}" Content="Escalader" Padding="4,0"
+                          ToolTip="Le ticket attend quelqu'un d'autre : il passe dans « à relancer »"/>
+                  <Button x:Name="BtnTicketClose" Grid.Column="4" Style="{StaticResource CkButton}" Content="Fermer" Padding="4,0"
+                          ToolTip="Ticket résolu : il compte dans « fermés aujourd'hui »"/>
+                </Grid>
+              </StackPanel>
+              <TextBlock x:Name="NoTicketText" Text="Aucun ticket en cours. « + Ticket » pour en ajouter un." Foreground="{StaticResource CkMuted}"
+                         TextWrapping="Wrap" Margin="0,12,0,2"/>
+
+              <!-- Ce qui vient de se passer, avec « Annuler » pendant quelques secondes. -->
+              <Grid x:Name="TicketMessage" Margin="0,10,0,0" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TicketMessageText" Text="" Foreground="{StaticResource CkMuted}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <Button x:Name="BtnTicketUndo" Grid.Column="1" Style="{StaticResource CkButton}" Content="Annuler" Margin="8,0,0,0"/>
+              </Grid>
             </StackPanel>
           </Border>
         </StackPanel>

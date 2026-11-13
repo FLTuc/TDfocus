@@ -37,7 +37,8 @@ Describe 'Interface' {
         $text | Should -Match 'Topmost="True"'
     }
     It 'chaque élément du cockpit utilisé dans le code existe dans son fichier XAML' {
-        $code = [System.IO.File]::ReadAllText((Join-Path $script:Src 'UI/Cockpit.ps1'))
+        # Tous les fichiers du cockpit : Cockpit.ps1, CockpitTickets.ps1…
+        $code = (Get-ChildItem (Join-Path $script:Src 'UI') -Filter 'Cockpit*.ps1' | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n"
         $missing = foreach ($pair in @(@('bubbleEls', 'CockpitBubble.xaml'), @('panelEls', 'CockpitPanel.xaml'))) {
             $xaml = [System.IO.File]::ReadAllText((Join-Path $script:Src "UI/$($pair[1])"))
             $names = [regex]::Matches($xaml, 'x:Name="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }

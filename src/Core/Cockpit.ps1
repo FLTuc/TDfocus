@@ -17,15 +17,20 @@ function ConvertTo-TdCockpitNumber {
 }
 
 function ConvertTo-TdCockpitSettings {
-    # Réglages du cockpit (dans settings.json) : affiché ou masqué, ouvert ou en bulle, place de la bulle.
+    # Réglages du cockpit (dans settings.json) : affiché ou masqué, ouvert ou en bulle, place de la bulle,
+    # durée avant l'alerte d'un ticket.
     param($InputObject)
     $enabled = Get-TdValue $InputObject 'enabled'
     if ($null -eq $enabled) { $enabled = $true }    # la bulle est visible par défaut
+    # Alerte douce quand un ticket dépasse cette durée : 30 min par défaut, de 1 min à 4 h.
+    $alert = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'ticketAlertMinutes')
+    if ($null -eq $alert -or $alert -lt 1 -or $alert -gt 240) { $alert = 30 }
     [ordered]@{
-        enabled = [bool]$enabled
-        open    = [bool](Get-TdValue $InputObject 'open')
-        left    = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'left')
-        top     = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'top')
+        enabled            = [bool]$enabled
+        open               = [bool](Get-TdValue $InputObject 'open')
+        left               = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'left')
+        top                = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'top')
+        ticketAlertMinutes = [int][Math]::Round($alert)
     }
 }
 

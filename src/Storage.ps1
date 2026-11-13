@@ -124,7 +124,9 @@ function Import-TdData {
     foreach ($d in @(Get-TdValue (Read-TdJsonFile (Get-TdDataPath 'daily.json')) 'items')) {
         if ($null -ne $d) { $daily.Add((ConvertTo-TdDailyAction $d)) }
     }
-    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes; checkins = $checkins; projects = $projects; daily = $daily }
+    # Tickets du cockpit : toute la lecture passe par Core\Tickets.ps1 (la « couche de données »).
+    $tickets = ConvertTo-TdTicketStore (Read-TdJsonFile (Get-TdDataPath 'tickets.json'))
+    @{ state = $state; settings = $settings; history = $history; templates = $templates; notes = $notes; checkins = $checkins; projects = $projects; daily = $daily; tickets = $tickets }
 }
 
 function ConvertTo-TdStateRecord {
@@ -185,12 +187,19 @@ function Save-TdDaily {
     Write-TdJsonFile (Get-TdDataPath 'daily.json') ([ordered]@{ version = 1; items = @($Daily) })
 }
 
+function Save-TdTickets {
+    param([Parameter(Mandatory)]$Store)
+    Write-TdJsonFile (Get-TdDataPath 'tickets.json') (ConvertTo-TdTicketStoreRecord $Store)
+}
+
 function Export-TdBackup {
     # Sauvegarde complète dans un seul fichier JSON.
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)]$Data)
     $settings = [ordered]@{}
     foreach ($k in $Data.settings.Keys) { $settings[$k] = $Data.settings[$k] }
     foreach ($k in @('todoistToken', 'notionToken')) { $settings[$k] = '' }
+    $tickets = $Data.tickets
+    if (-not $tickets) { $tickets = New-TdTicketStore }
     Write-TdJsonFile $Path ([ordered]@{
             app       = 'TDfocus'
             version   = 1
@@ -203,6 +212,7 @@ function Export-TdBackup {
             checkins  = @($Data.checkins)
             projects  = @($Data.projects)
             daily     = @($Data.daily)
+            tickets   = ConvertTo-TdTicketStoreRecord $tickets
         })
 }
 
@@ -231,5 +241,6 @@ function Import-TdBackup {
         checkins  = $checkins
         projects  = $projects
         daily     = $daily
+        tickets   = ConvertTo-TdTicketStore (Get-TdValue $raw 'tickets')
     }
 }

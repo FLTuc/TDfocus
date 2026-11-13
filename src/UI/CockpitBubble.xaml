@@ -9,13 +9,15 @@
         FontSize="14" UseLayoutRounding="True" SnapsToDevicePixels="True">
   <Grid>
     <!-- Un vrai bouton : lisible par un lecteur d'écran, activable au clavier. -->
-    <Button x:Name="BubbleButton" Width="84" Height="84" Cursor="Hand"
+    <!-- BorderBrush = couleur du contour : gris au repos, bleu quand le chrono d'un ticket tourne,
+         couleur d'alerte quand ce ticket dépasse la limite (réglé par le code). -->
+    <Button x:Name="BubbleButton" Width="84" Height="84" Cursor="Hand" BorderBrush="#3A3F4A"
             AutomationProperties.Name="Cockpit TDfocus : ouvrir"
             ToolTip="Tickets fermés aujourd'hui. Clic : ouvrir le cockpit. Glisser : déplacer la bulle.">
       <Button.Template>
         <ControlTemplate TargetType="Button">
           <Grid>
-            <Ellipse x:Name="Disc" Fill="#1F2229" Stroke="#3A3F4A" StrokeThickness="2">
+            <Ellipse x:Name="Disc" Fill="#1F2229" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="2">
               <Ellipse.Effect>
                 <DropShadowEffect BlurRadius="6" ShadowDepth="2" Direction="270" Opacity="0.45" Color="#000000"/>
               </Ellipse.Effect>
@@ -23,12 +25,12 @@
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Grid>
           <ControlTemplate.Triggers>
-            <!-- Survol ou clavier : le contour passe au bleu, sans animation. -->
+            <!-- Survol ou clavier : le contour s'éclaircit, sans animation. -->
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Disc" Property="Stroke" Value="#5B9BF0"/>
+              <Setter TargetName="Disc" Property="Stroke" Value="#9AA1AC"/>
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Disc" Property="Stroke" Value="#5B9BF0"/>
+              <Setter TargetName="Disc" Property="Stroke" Value="#E8EAED"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -39,7 +41,7 @@
         <TextBlock x:Name="BubbleLabel" Text="fermés" FontSize="11" Foreground="#9AA1AC" HorizontalAlignment="Center"/>
       </StackPanel>
     </Button>
-    <!-- Pastille orange « relances dues » (étape 5) : cachée pour l'instant. -->
+    <!-- Pastille orange : au moins une relance est due aujourd'hui. -->
     <Ellipse x:Name="BubbleDot" Width="20" Height="20" Fill="#F0A35B" Stroke="#16181D" StrokeThickness="3"
              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,9,9,0"
              Visibility="Collapsed" IsHitTestVisible="False"/>

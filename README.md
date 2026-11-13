@@ -217,10 +217,6 @@ pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape
 
 **Étape 1 (disponible)** : la bulle et la fenêtre.
 
-| La bulle | Le cockpit (encore vide) |
-|---|---|
-| ![Bulle du cockpit](docs/captures/cockpit-bulle.png) | ![Cockpit ouvert, étape 1](docs/captures/cockpit-ouvert.png) |
-
 - La bulle (84 px) se déplace en la faisant glisser ; sa place est mémorisée.
 - Un clic l'ouvre en cockpit (420 × 860, ou moins haut sur un petit écran : le contenu défile).
   Le cockpit s'ouvre du côté de l'écran où se trouve la bulle, et se déplace par son en-tête.
@@ -229,7 +225,30 @@ pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape
   retrouver : icône TDfocus près de l'horloge ▸ **Cockpit**, ou Réglages ▸ Confort.
 - Thème sombre fixe et police Inter (fournie avec TDfocus, rien à installer).
 
-À venir : tickets et chrono, jauge « Équilibre du jour », projets, relances, blocs projet,
+**Étape 2 (disponible)** : les tickets.
+
+| Je veux… | Je fais |
+|---|---|
+| noter un ticket | **+ Ticket**, un numéro ou un sujet (facultatif), Entrée |
+| commencer | **Démarrer** : le chrono tourne, la barre avance vers 30 min |
+| souffler | **Pause**, puis **Reprendre** |
+| passer la main | **Escalader** : le ticket part dans « à relancer » (prochain jour ouvré) |
+| terminer | **Fermer** : « fermés aujourd'hui » et la bulle gagnent 1 |
+| revenir en arrière | **Annuler**, proposé quelques secondes après chaque action |
+| voir une liste | clic sur une tuile (ouverts, fermés aujourd'hui, à relancer) |
+
+- **Un seul chrono à la fois** : démarrer un ticket met en pause la tâche TDfocus en cours, et
+  inversement. Aucune minute n'est comptée deux fois.
+- **Alerte douce à 30 min** : un tintement, puis la barre et le chrono changent de couleur, sans
+  clignoter. La durée se règle dans Réglages ▸ Confort (de 1 à 240 min).
+- **La bulle** affiche le nombre de tickets fermés aujourd'hui. Son contour est bleu quand le
+  chrono d'un ticket tourne ; une **pastille orange** signale une relance à faire aujourd'hui.
+- Les tickets sont saisis à la main et enregistrés sur le PC (`tickets.json`). Tout passe par
+  une **couche de données séparée** (`src/Core/Tickets.ps1`) : pour brancher plus tard l'outil
+  de ticketing, il suffira d'appeler `Merge-TdExternalTickets` avec la liste lue dans son API,
+  sans toucher à l'affichage.
+
+À venir : jauge « Équilibre du jour », projets, relances, blocs projet,
 note « Où j'en étais » et récap du jour.
 
 **Limites du « toujours au-dessus »** (propriété `Topmost` de Windows) : la bulle ne passe pas
@@ -366,13 +385,15 @@ src/
   Core/                logique pure, testée : tâches et sous-étapes, projection horaire, saisie
                        rapide, routines, statistiques, imports (iCal, Todoist, Notion, texte),
                        notes, signaux (atterrissage, fin, carillon), points de contrôle, revue,
-                       projets au long cours et actions du quotidien
+                       projets au long cours et actions du quotidien, tickets du cockpit
+                       (Tickets.ps1 : la couche de données, prête pour une future API)
   Storage.ps1          persistance JSON atomique, sauvegardes, chiffrement des jetons
   Audio/               synthèse sonore (PowerShell pur) et lecture
   Platform/            Windows (clé Run, lanceur TDfocus.exe, imports réseau) et Linux (XDG,
                        émulateurs de terminal, notifications)
   UI/                  Windows : fenêtre XAML, thèmes, vue principale, liste, panneaux,
-                       cockpit flottant (Cockpit.ps1, CockpitBubble.xaml, CockpitPanel.xaml)
+                       cockpit flottant (Cockpit.ps1, CockpitTickets.ps1, CockpitBubble.xaml,
+                       CockpitPanel.xaml)
   Terminal/            Linux : texte et couleurs, écrans, clavier et minuteur, sons
 assets/                icône, police Inter du cockpit (assets/fonts, licence OFL)
 tests/                 tests Pester (cœur, fonctionnalités, imports, terminal, dépôt) et test d'interface
@@ -398,6 +419,8 @@ Invoke-Pester -Path tests
   d'accumulation au changement de jour).
 - `tests/Cockpit.Tests.ps1` : cockpit flottant (place de la bulle, taille et place du cockpit
   selon l'écran, réglages).
+- `tests/Tickets.Tests.ps1` : tickets du cockpit (ajout, chrono et temps par jour, un seul
+  chrono à la fois, alerte, fermer, escalader, relancer, annuler, enregistrement).
 - `tests/Terminal.Tests.ps1` : version Linux (largeur des caractères, écrans à toutes les
   tailles, clavier, minuteur, intégration XDG).
 - `tools/test_tui_pty.py` : lance la version Linux dans un vrai pseudo-terminal, la pilote au

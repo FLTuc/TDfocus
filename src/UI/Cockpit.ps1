@@ -1,16 +1,18 @@
-﻿# TDfocus - cockpit flottant (helpdesk et projets), étape 1 : la bulle et la fenêtre du cockpit.
+﻿# TDfocus - cockpit flottant (helpdesk et projets) : la bulle et la fenêtre du cockpit.
 #
 # Deux petites fenêtres, indépendantes de la fenêtre principale et toujours au-dessus des autres :
 #   - la bulle (au repos) : ronde, déplaçable ; un clic ouvre le cockpit ;
-#   - le cockpit : en-tête avec la date et l'heure, bouton « réduire en bulle ».
+#   - le cockpit : en-tête avec la date et l'heure, bouton « réduire en bulle », puis les cartes.
 # « Toujours au-dessus » = propriété Topmost des fenêtres WPF (voir les fichiers .xaml).
 # Les calculs (positions, tailles) sont dans src\Core\Cockpit.ps1 ; ici, on ne fait qu'afficher.
+# La carte « Tickets » est dans CockpitTickets.ps1.
 #
 # Tout est rangé dans $script:Td.Cockpit :
 #   Bubble, Panel         les deux fenêtres
 #   BubbleEls, PanelEls   leurs éléments nommés (x:Name dans le XAML)
 #   Anchor                le coin de l'écran où se trouve la bulle (voir Get-TdCockpitAnchor)
 #   Clock                 la dernière heure affichée (pour ne redessiner que si elle change)
+#   ListKind, Undo, MessageUntil, Chrono   la carte Tickets (voir CockpitTickets.ps1)
 
 function Initialize-TdCockpit {
     # Construit les deux fenêtres, sans les afficher. En cas de problème, TDfocus continue sans cockpit.
@@ -30,8 +32,13 @@ function Initialize-TdCockpit {
             PanelEls  = Get-TdNamedElements -Root $panel -Xaml $panelXaml
             Anchor    = @{ Right = $true; Bottom = $true }
             Clock     = ''
+            ListKind  = $null
+            Undo      = $null
+            MessageUntil = [long]0
+            Chrono    = ''
         }
         Register-TdCockpitEvents
+        Register-TdCockpitTicketEvents
     }
     catch {
         $script:Td.Cockpit = $null
@@ -275,15 +282,39 @@ function Complete-TdCockpitPanelMove {
 # ---------------------------------------------------------------- mise à jour (appelée par le minuteur de TDfocus)
 
 function Update-TdCockpit {
-    # Met à jour la date et l'heure de l'en-tête, seulement quand le cockpit est ouvert et que l'heure change.
+    # Appelée 4 fois par seconde par le minuteur de TDfocus, et après chaque action (-Force).
     param([Parameter(Mandatory)][long]$NowMs, [switch]$Force)
     $ck = $script:Td.Cockpit
     if (-not $ck) { return }
-    if (-not $Force -and -not $ck.Panel.IsVisible) { return }
+    $store = $script:Td.Data.tickets
+
+    # 1. Les chronos, toujours (même cockpit réduit ou masqué) : un seul à la fois, alerte à la limite.
+    $changed = $false
+    $paused = Sync-TdChronos -State (Get-TdState) -Store $store
+    if ($paused) {
+        Show-TdChronoPaused -What $paused
+        $changed = $true
+    }
+    $ticket = Get-TdCurrentTicket $store
+    if ($ticket -and $null -ne $ticket.runningSince) {
+        if (Test-TdTicketAlert -Ticket $ticket -NowMs $NowMs -Minutes ([int]$script:Td.Data.settings.cockpit.ticketAlertMinutes)) {
+            Send-TdTicketAlert -Ticket $ticket
+            $changed = $true
+        }
+    }
+    if ($ck.MessageUntil -gt 0 -and $NowMs -ge $ck.MessageUntil) { Hide-TdTicketMessage }
+
+    # 2. L'affichage complet : quand la minute change, ou tout de suite si quelque chose a changé.
     $clock = Format-TdClock $NowMs
-    if (-not $Force -and $clock -eq $ck.Clock) { return }
-    $ck.Clock = $clock
-    $panelEls = $ck.PanelEls
-    $panelEls.DateText.Text = Format-TdCockpitDate $NowMs
-    $panelEls.TimeText.Text = [string][char]0x00B7 + ' ' + $clock
+    if ($Force -or $changed -or $clock -ne $ck.Clock) {
+        $ck.Clock = $clock
+        $panelEls = $ck.PanelEls
+        $panelEls.DateText.Text = Format-TdCockpitDate $NowMs
+        $panelEls.TimeText.Text = [string][char]0x00B7 + ' ' + $clock
+        Update-TdCockpitTickets -NowMs $NowMs
+        return
+    }
+
+    # 3. Entre deux, seul le chrono du ticket en cours avance (si le cockpit est ouvert).
+    if ($ck.Panel.IsVisible) { Update-TdTicketChrono -NowMs $NowMs }
 }
