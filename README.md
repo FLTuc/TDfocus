@@ -217,6 +217,10 @@ pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape
 
 **Étape 1 (disponible)** : la bulle et la fenêtre.
 
+| La bulle | Le cockpit (encore vide) |
+|---|---|
+| ![Bulle du cockpit](docs/captures/cockpit-bulle.png) | ![Cockpit ouvert, étape 1](docs/captures/cockpit-ouvert.png) |
+
 - La bulle (84 px) se déplace en la faisant glisser ; sa place est mémorisée.
 - Un clic l'ouvre en cockpit (420 × 860, ou moins haut sur un petit écran : le contenu défile).
   Le cockpit s'ouvre du côté de l'écran où se trouve la bulle, et se déplace par son en-tête.
