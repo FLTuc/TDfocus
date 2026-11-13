@@ -316,6 +316,11 @@ function Update-TdCockpitTickets {
     if ($counts.followUpDue -gt 0) { $waitingBrush = 'CkProjects' }
     Set-TdTicketTile -Block $panelEls.TileWaitingCount -Count $counts.waiting -Brush $waitingBrush
     Set-TdCockpitVisible $panelEls.TileWaitingDot ($counts.followUpDue -gt 0)
+    # Accord : « 1 ouvert », « 2 ouverts ».
+    $panelEls.TileOpenLabel.Text = 'ouvert'
+    if ($counts.open -gt 1) { $panelEls.TileOpenLabel.Text = 'ouverts' }
+    $panelEls.TileClosedLabel.Text = "fermé aujourd'hui"
+    if ($counts.closedToday -gt 1) { $panelEls.TileClosedLabel.Text = "fermés aujourd'hui" }
     $urgent = ''
     if ($counts.urgent -eq 1) { $urgent = ' ' + [char]0x00B7 + ' 1 urgent' }
     elseif ($counts.urgent -gt 1) { $urgent = ' ' + [char]0x00B7 + " $($counts.urgent) urgents" }

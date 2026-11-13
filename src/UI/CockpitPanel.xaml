@@ -255,14 +255,14 @@
                   <StackPanel>
                     <TextBlock x:Name="TileOpenCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
                                LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
-                    <TextBlock FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"><Run Text="ouverts"/><Run x:Name="TileOpenUrgent" Text="" Foreground="{StaticResource CkAlert}"/></TextBlock>
+                    <TextBlock FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"><Run x:Name="TileOpenLabel" Text="ouvert"/><Run x:Name="TileOpenUrgent" Text="" Foreground="{StaticResource CkAlert}"/></TextBlock>
                   </StackPanel>
                 </Button>
                 <Button x:Name="TileClosed" Grid.Column="2" Style="{StaticResource CkTile}" ToolTip="Tickets fermés aujourd'hui : cliquer pour voir la liste">
                   <StackPanel>
                     <TextBlock x:Name="TileClosedCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
                                LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
-                    <TextBlock Text="fermés aujourd'hui" FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TileClosedLabel" Text="fermé aujourd'hui" FontSize="11" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Button>
                 <Grid Grid.Column="4">

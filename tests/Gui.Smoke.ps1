@@ -468,14 +468,14 @@ function Invoke-TdSmokeTest {
     $keyArgs.RoutedEvent = [System.Windows.Input.Keyboard]::KeyDownEvent
     $pe.TicketBox.RaiseEvent($keyArgs)
     Wait-TdUi 120
-    Assert-Td ($tickets.items.Count -eq 1 -and $pe.TileOpenCount.Text -eq '1' -and -not $pe.AddForm.IsVisible) 'ticket ajouté avec Entrée : tuile « ouverts » à 1'
+    Assert-Td ($tickets.items.Count -eq 1 -and $pe.TileOpenCount.Text -eq '1' -and $pe.TileOpenLabel.Text -eq 'ouvert' -and -not $pe.AddForm.IsVisible) 'ticket ajouté avec Entrée : tuile « 1 ouvert »'
     Assert-Td ($pe.CurrentBox.IsVisible -and $pe.CurrentRef.Text -eq 'INC-4821 · VPN impossible (compta)' -and $pe.BtnTicketToggle.Content -eq 'Démarrer' -and $pe.CurrentChrono.Text -eq '00:00') 'il devient le ticket en cours, chrono à l''arrêt'
     # Deuxième ticket, urgent, par le bouton « Ajouter »
     Invoke-TdClick $pe.BtnAddTicket
     $pe.TicketBox.Text = 'INC-4830 Imprimante RH'
     Invoke-TdClick $pe.TicketUrgent
     Invoke-TdClick $pe.BtnAddConfirm
-    Assert-Td ($pe.TileOpenCount.Text -eq '2' -and $pe.TileOpenUrgent.Text -like '*1 urgent' -and $pe.CurrentRef.Text -like 'INC-4821*') 'deuxième ticket urgent : 2 ouverts dont 1 urgent, le ticket en cours ne change pas'
+    Assert-Td ($pe.TileOpenCount.Text -eq '2' -and $pe.TileOpenLabel.Text -eq 'ouverts' -and $pe.TileOpenUrgent.Text -like '*1 urgent' -and $pe.CurrentRef.Text -like 'INC-4821*') 'deuxième ticket urgent : 2 ouverts dont 1 urgent, le ticket en cours ne change pas'
     # Troisième ticket sans libellé, puis « Annuler »
     Invoke-TdClick $pe.BtnAddTicket
     Invoke-TdClick $pe.BtnAddConfirm
