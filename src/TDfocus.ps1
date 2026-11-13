@@ -52,7 +52,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Windows.Forms, System.Drawing
 
 . (Join-Path $PSScriptRoot 'TDfocus.Core.ps1')
-foreach ($part in @('Audio\Synth', 'Audio\Player', 'Platform\Windows', 'Platform\Integrations', 'UI\Theme', 'UI\Helpers', 'UI\App', 'UI\Rows', 'UI\Drawers', 'UI\Projects', 'UI\Tray')) {
+foreach ($part in @('Audio\Synth', 'Audio\Player', 'Platform\Windows', 'Platform\Integrations', 'UI\Theme', 'UI\Helpers', 'UI\App', 'UI\Rows', 'UI\Drawers', 'UI\Projects', 'UI\Cockpit', 'UI\Tray')) {
     . (Join-Path $PSScriptRoot "$part.ps1")
 }
 
@@ -103,6 +103,7 @@ try {
     }
 
     Initialize-TdTray
+    Initialize-TdCockpit    # bulle et cockpit flottants (construits ici, affichés plus bas)
     if (-not $SmokeTest) { [void](Set-TdAutostart -Enabled ([bool]$settings.autostart) -ScriptPath $PSCommandPath) }
 
     $timer = New-Object System.Windows.Threading.DispatcherTimer
@@ -124,6 +125,7 @@ try {
         $timer.Start()
         $showWindow = -not ($Startup -and $settings.startMinimized -and $script:Td.Tray)
         if ($showWindow) { $script:Td.Window.Show() }
+        if ($settings.cockpit.enabled) { Show-TdCockpit }
         $global:Error.Clear()
         $ErrorActionPreference = 'Continue'
         [void]$app.Run()

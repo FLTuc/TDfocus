@@ -18,6 +18,8 @@ function Initialize-TdTray {
         $done.Add_Click({ Complete-TdCurrentNow })
         $compact = $menu.Items.Add('Mode compact flottant')
         $compact.Add_Click({ Show-TdWindow; Set-TdCompactMode $true })
+        $cockpit = $menu.Items.Add('Cockpit (helpdesk et projets)')
+        $cockpit.Add_Click({ Show-TdCockpit -Open })
         [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
         $quit = $menu.Items.Add('Quitter TDfocus')
         $quit.Add_Click({ $script:Td.Quitting = $true; Stop-TdApp })

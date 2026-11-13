@@ -1046,6 +1046,9 @@ function Build-TdSettingsPanel {
             }))
 
     Add-TdSection $Panel 'Confort'
+    [void]$Panel.Children.Add((New-TdSwitch -Label 'Bulle Cockpit toujours au-dessus des autres fenêtres' -Checked ([bool]$settings.cockpit.enabled) -ToolTip 'Petite bulle flottante pour le helpdesk et les projets. Un clic l''ouvre, on la déplace en la faisant glisser.' -OnChange {
+                if ($this.IsChecked) { Show-TdCockpit } else { Hide-TdCockpit }
+            }))
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Mode compact toujours au premier plan' -Checked $settings.compactTopmost -OnChange {
                 (Get-TdSettings).compactTopmost = [bool]$this.IsChecked
                 Save-TdSettingsNow

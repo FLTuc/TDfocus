@@ -64,6 +64,7 @@ function Initialize-TdApp {
         EditingTemplateId = $null
         TemplateDraft     = $null
         EditingDailyId    = $null
+        Cockpit           = $null
         Timer             = $null
         Stopped           = $false
     }
@@ -1033,6 +1034,7 @@ function Invoke-TdTick {
         if ($script:Td.Compact) { Set-TdCompactMode $false }
         Show-TdWindow
     }
+    Update-TdCockpit -NowMs $now
     Update-TdJobs
     $preparing = 0
     if ($script:TdAudio) { $preparing = $script:TdAudio.Jobs.Count }

@@ -17,6 +17,8 @@ function Initialize-TdNative {
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
 [DllImport("dwmapi.dll", PreserveSig = true)] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+[DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+[DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 '@
         }
         $script:TdNativeReady = $true
@@ -32,6 +34,20 @@ function Hide-TdConsole {
     try {
         $handle = [TDfocus.Native]::GetConsoleWindow()
         if ($handle -ne [IntPtr]::Zero) { [void][TDfocus.Native]::ShowWindow($handle, 0) }
+    }
+    catch { $null = $_ }
+}
+
+function Set-TdToolWindow {
+    # Retire une fenêtre de la liste Alt+Tab (style « fenêtre outil »), sans changer son apparence.
+    # À appeler quand la fenêtre vient d'être créée (événement SourceInitialized), avant son affichage.
+    param([Parameter(Mandatory)]$Window)
+    if (-not (Initialize-TdNative)) { return }
+    try {
+        $hwnd = (New-Object System.Windows.Interop.WindowInteropHelper $Window).Handle
+        if ($hwnd -eq [IntPtr]::Zero) { return }
+        $style = [TDfocus.Native]::GetWindowLong($hwnd, -20)                       # -20 : styles étendus de la fenêtre
+        [void][TDfocus.Native]::SetWindowLong($hwnd, -20, ($style -bor 0x80))      # 0x80 : WS_EX_TOOLWINDOW
     }
     catch { $null = $_ }
 }

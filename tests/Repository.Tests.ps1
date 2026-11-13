@@ -29,6 +29,30 @@ Describe 'Interface' {
         $script:XamlText | Should -Not -Match 'x:Class'
         $script:XamlText | Should -Not -Match '\s(Click|Loaded|Checked)="'
     }
+    It 'les fenêtres du cockpit (<_>) sont bien formées, sans x:Class ni gestionnaire déclaré' -ForEach @('CockpitBubble.xaml', 'CockpitPanel.xaml') {
+        $text = [System.IO.File]::ReadAllText((Join-Path $script:Src "UI/$_"))
+        { [xml]$text } | Should -Not -Throw
+        $text | Should -Not -Match 'x:Class'
+        $text | Should -Not -Match '\s(Click|Loaded|Checked)="'
+        $text | Should -Match 'Topmost="True"'
+    }
+    It 'chaque élément du cockpit utilisé dans le code existe dans son fichier XAML' {
+        $code = [System.IO.File]::ReadAllText((Join-Path $script:Src 'UI/Cockpit.ps1'))
+        $missing = foreach ($pair in @(@('bubbleEls', 'CockpitBubble.xaml'), @('panelEls', 'CockpitPanel.xaml'))) {
+            $xaml = [System.IO.File]::ReadAllText((Join-Path $script:Src "UI/$($pair[1])"))
+            $names = [regex]::Matches($xaml, 'x:Name="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+            foreach ($m in [regex]::Matches($code, '\$' + $pair[0] + '\.([A-Z][A-Za-z0-9]+)')) {
+                if ($names -notcontains $m.Groups[1].Value) { '{0}: {1}' -f $pair[1], $m.Groups[1].Value }
+            }
+        }
+        $missing | Sort-Object -Unique | Should -BeNullOrEmpty
+    }
+    It 'la police Inter du cockpit est fournie avec sa licence' {
+        $fonts = Join-Path $script:Root 'assets/fonts'
+        foreach ($file in @('Inter-Regular.ttf', 'Inter-SemiBold.ttf', 'Inter-Bold.ttf', 'LICENSE.txt')) {
+            Test-Path -LiteralPath (Join-Path $fonts $file) | Should -BeTrue
+        }
+    }
     It 'chaque élément $ui.Nom utilisé dans le code existe dans MainWindow.xaml' {
         $names = [regex]::Matches($script:XamlText, 'x:Name="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
         $missing = foreach ($file in Get-ChildItem (Join-Path $script:Src 'UI') -Filter '*.ps1') {

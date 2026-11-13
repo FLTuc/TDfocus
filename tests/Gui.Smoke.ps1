@@ -39,16 +39,20 @@ function Find-TdDescendant {
 }
 
 function Save-TdScreenshot {
-    param([Parameter(Mandatory)][string]$Name)
+    # -Window : une autre fenêtre que la principale (bulle ou cockpit flottant).
+    param([Parameter(Mandatory)][string]$Name, $Window = $script:Td.Window)
     if (-not $script:TdSmokeOutput) { return }
     Wait-TdUi 250
-    $root = $script:Td.Window.Content
+    $root = $Window.Content
     $w = [int][Math]::Ceiling($root.ActualWidth)
     $h = [int][Math]::Ceiling($root.ActualHeight)
     # Fond de la fenêtre, puis le contenu rendu tel quel (sans recadrage ni mise à l'échelle).
+    # Fenêtre transparente (bulle, cockpit) : un fond uni joue le rôle du bureau, pour voir les contours.
+    $brush = $Window.Background
+    if ($Window.AllowsTransparency) { $brush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.Color]::FromRgb(0x4A, 0x52, 0x66)) }
     $background = New-Object System.Windows.Media.DrawingVisual
     $dc = $background.RenderOpen()
-    $dc.DrawRectangle($script:Td.Window.Background, $null, (New-Object System.Windows.Rect 0, 0, $w, $h))
+    $dc.DrawRectangle($brush, $null, (New-Object System.Windows.Rect 0, 0, $w, $h))
     $dc.Close()
     $bitmap = New-Object System.Windows.Media.Imaging.RenderTargetBitmap $w, $h, 96, 96, ([System.Windows.Media.PixelFormats]::Pbgra32)
     $bitmap.Render([System.Windows.Media.Visual]$background)
@@ -383,6 +387,69 @@ function Invoke-TdSmokeTest {
     Assert-Td ($reloaded.projects.Count -eq 4 -and $reloaded.daily.Count -eq 3) 'projets et quotidien relus depuis le disque'
     Close-TdDrawer
     Save-TdScreenshot '22-journee-avec-quotidien'
+
+    # Cockpit flottant, étape 1 : bulle toujours au-dessus, ouverture, réduction, position mémorisée
+    $ck = $script:Td.Cockpit
+    Assert-Td ($null -ne $ck) 'cockpit construit (bulle et fenêtre)'
+    Assert-Td ($script:Td.Data.settings.cockpit.enabled -and -not $ck.Bubble.IsVisible) 'bulle prévue par défaut, pas encore affichée pendant le test'
+    Show-TdCockpit
+    Wait-TdUi 300
+    Assert-Td ($ck.Bubble.IsVisible -and $ck.Bubble.Topmost -and -not $ck.Bubble.ShowInTaskbar) 'bulle affichée, toujours au-dessus, hors barre des tâches'
+    Assert-Td ($ck.BubbleEls.BubbleButton.ActualWidth -eq 84 -and $ck.BubbleEls.BubbleButton.ActualHeight -eq 84 -and $ck.BubbleEls.BubbleCount.Text -eq '0') 'bulle ronde de 84 px avec son compteur'
+    $bubbleHandle = (New-Object System.Windows.Interop.WindowInteropHelper $ck.Bubble).Handle
+    Assert-Td (([TDfocus.Native]::GetWindowLong($bubbleHandle, -20) -band 0x80) -ne 0) 'bulle absente de la liste Alt+Tab'
+    $area = Get-TdCockpitWorkArea -Left $ck.Bubble.Left -Top $ck.Bubble.Top
+    Write-Host ("  écran de test : zone utilisable {0} x {1}" -f [int]$area.Width, [int]$area.Height)
+    Assert-Td ($ck.Bubble.Left -ge $area.Left -and $ck.Bubble.Left + $ck.Bubble.Width -le $area.Left + $area.Width + 1 -and $ck.Bubble.Top + $ck.Bubble.Height -le $area.Top + $area.Height + 1) "bulle entièrement dans l'écran, en bas à droite ($([int]$ck.Bubble.Left), $([int]$ck.Bubble.Top))"
+    # Police Inter fournie avec TDfocus (aucune installation sur le PC)
+    $typeface = New-Object System.Windows.Media.Typeface $ck.Panel.FontFamily, ([System.Windows.FontStyles]::Normal), ([System.Windows.FontWeights]::SemiBold), ([System.Windows.FontStretches]::Normal)
+    $glyphs = $null
+    [void]$typeface.TryGetGlyphTypeface([ref]$glyphs)
+    Assert-Td ($null -ne $glyphs -and "$($glyphs.FontUri)" -like '*Inter-SemiBold.ttf') "police Inter chargée depuis assets\fonts ($($glyphs.FontUri))"
+    Save-TdScreenshot '24-cockpit-bulle' -Window $ck.Bubble
+
+    # Clic sur la bulle, par le vrai gestionnaire de souris : le cockpit s'ouvre
+    $down = New-Object System.Windows.Input.MouseButtonEventArgs ([System.Windows.Input.Mouse]::PrimaryDevice), 0, ([System.Windows.Input.MouseButton]::Left)
+    $down.RoutedEvent = [System.Windows.UIElement]::PreviewMouseLeftButtonDownEvent
+    $ck.BubbleEls.BubbleButton.RaiseEvent($down)
+    Wait-TdUi 300
+    Assert-Td ($ck.Panel.IsVisible -and -not $ck.Bubble.IsVisible -and $ck.Panel.Topmost) 'clic sur la bulle : le cockpit s''ouvre, toujours au-dessus'
+    Assert-Td ($ck.Panel.Width -eq 420 -and $ck.Panel.Height -le 860 -and $ck.Panel.Height -le $area.Height) "cockpit de 420 px de large, hauteur adaptée à l'écran ($([int]$ck.Panel.Height) px)"
+    Assert-Td ($ck.Panel.Left -ge $area.Left -and $ck.Panel.Top -ge $area.Top -and $ck.Panel.Left + $ck.Panel.Width -le $area.Left + $area.Width -and $ck.Panel.Top + $ck.Panel.Height -le $area.Top + $area.Height) 'cockpit entièrement dans l''écran'
+    Assert-Td ($ck.PanelEls.TimeText.Text -match '\d{2}:\d{2}' -and $ck.PanelEls.DateText.Text.Length -gt 3) "date et heure dans l'en-tête ($($ck.PanelEls.DateText.Text) $($ck.PanelEls.TimeText.Text))"
+    Assert-Td ($ck.PanelEls.BtnReduce.ActualWidth -ge 44 -and $ck.PanelEls.BtnReduce.ActualHeight -ge 44) 'bouton « réduire en bulle » d''au moins 44 px'
+    Assert-Td ($script:Td.Data.settings.cockpit.open) 'état « ouvert » mémorisé'
+    Save-TdScreenshot '25-cockpit-ouvert' -Window $ck.Panel
+    Invoke-TdClick $ck.PanelEls.BtnReduce
+    Assert-Td ($ck.Bubble.IsVisible -and -not $ck.Panel.IsVisible -and -not $script:Td.Data.settings.cockpit.open) '« réduire en bulle » : retour à la bulle'
+
+    # Déplacement de la bulle : sa place est mémorisée ; lâchée hors de l'écran, elle y est ramenée
+    $startLeft = $ck.Bubble.Left
+    $startTop = $ck.Bubble.Top
+    $ck.Bubble.Left = $area.Left + 40
+    $ck.Bubble.Top = $area.Top + 60
+    Complete-TdCockpitBubbleMove -StartLeft $startLeft -StartTop $startTop
+    Assert-Td (-not $ck.Panel.IsVisible -and $script:Td.Data.settings.cockpit.left -eq [Math]::Round($area.Left + 40)) 'bulle déplacée : place mémorisée, sans ouvrir le cockpit'
+    $ck.Bubble.Left = $area.Left - 500
+    Complete-TdCockpitBubbleMove -StartLeft ($area.Left + 40) -StartTop ($area.Top + 60)
+    Assert-Td ($ck.Bubble.Left -ge $area.Left) 'bulle lâchée hors de l''écran : ramenée dans la zone visible'
+    $savedCockpit = (Import-TdData).settings.cockpit
+    Assert-Td ($savedCockpit.enabled -and -not $savedCockpit.open -and $savedCockpit.top -eq [Math]::Round($area.Top + 60)) 'réglages du cockpit relus depuis le disque'
+    # Bulle en haut à gauche : le cockpit s'ouvre de ce côté ; déplacé, il emmène la bulle avec lui
+    Open-TdCockpitPanel
+    Assert-Td ($ck.Panel.Left -lt $area.Left + $area.Width / 2 -and $ck.Panel.Top -lt $area.Top + 100) 'le cockpit s''ouvre du côté où se trouve la bulle'
+    $startLeft = $ck.Panel.Left
+    $ck.Panel.Left = $startLeft + 120
+    Complete-TdCockpitPanelMove -StartLeft $startLeft -StartTop $ck.Panel.Top
+    Close-TdCockpitPanel
+    Assert-Td ([Math]::Abs($ck.Bubble.Left - ($startLeft + 120)) -le 1) 'cockpit déplacé : la bulle le suit'
+    # Masquer, puis retrouver par le menu de la zone de notification (même action)
+    Hide-TdCockpit
+    Assert-Td (-not $ck.Bubble.IsVisible -and -not $ck.Panel.IsVisible -and -not $script:Td.Data.settings.cockpit.enabled) '« masquer la bulle »'
+    Show-TdCockpit -Open
+    Assert-Td ($ck.Panel.IsVisible -and $script:Td.Data.settings.cockpit.enabled) 'cockpit rouvert depuis le menu'
+    Hide-TdCockpit
+    Assert-Td ($w.IsVisible -and $ui.MainRoot.Visibility -eq 'Visible') 'la fenêtre principale n''est pas affectée par le cockpit'
 
     # Sons calculés en arrière-plan (PowerShell pur)
     $deadline = (Get-Date).AddSeconds(240)

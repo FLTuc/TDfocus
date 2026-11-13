@@ -210,6 +210,29 @@ Pourquoi ces choix :
 
 ![Actions du quotidien et leurs jours](docs/captures/quotidien.png)
 
+### Cockpit flottant (helpdesk et projets) — en construction
+
+Une **bulle ronde**, toujours au-dessus des autres fenêtres, qui s'ouvre en un **cockpit**
+pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape.
+
+**Étape 1 (disponible)** : la bulle et la fenêtre.
+
+- La bulle (84 px) se déplace en la faisant glisser ; sa place est mémorisée.
+- Un clic l'ouvre en cockpit (420 × 860, ou moins haut sur un petit écran : le contenu défile).
+  Le cockpit s'ouvre du côté de l'écran où se trouve la bulle, et se déplace par son en-tête.
+- Le bouton en haut à droite le **réduit en bulle**.
+- Clic droit sur la bulle : ouvrir le cockpit, ouvrir TDfocus, ou **masquer la bulle**. Pour la
+  retrouver : icône TDfocus près de l'horloge ▸ **Cockpit**, ou Réglages ▸ Confort.
+- Thème sombre fixe et police Inter (fournie avec TDfocus, rien à installer).
+
+À venir : tickets et chrono, jauge « Équilibre du jour », projets, relances, blocs projet,
+note « Où j'en étais » et récap du jour.
+
+**Limites du « toujours au-dessus »** (propriété `Topmost` de Windows) : la bulle ne passe pas
+au-dessus du menu Démarrer, de l'écran de verrouillage, des demandes d'autorisation
+administrateur ni d'un jeu en plein écran, et une autre fenêtre « toujours au-dessus » peut la
+recouvrir. Le cockpit existe sous Windows uniquement.
+
 ### Stimulations sensorielles (🎧)
 
 - **Ambiances** : bruit blanc, rose ou brun, pluie douce, carillon d'ambiance. Elles sont
@@ -344,9 +367,10 @@ src/
   Audio/               synthèse sonore (PowerShell pur) et lecture
   Platform/            Windows (clé Run, lanceur TDfocus.exe, imports réseau) et Linux (XDG,
                        émulateurs de terminal, notifications)
-  UI/                  Windows : fenêtre XAML, thèmes, vue principale, liste, panneaux
+  UI/                  Windows : fenêtre XAML, thèmes, vue principale, liste, panneaux,
+                       cockpit flottant (Cockpit.ps1, CockpitBubble.xaml, CockpitPanel.xaml)
   Terminal/            Linux : texte et couleurs, écrans, clavier et minuteur, sons
-assets/                icône
+assets/                icône, police Inter du cockpit (assets/fonts, licence OFL)
 tests/                 tests Pester (cœur, fonctionnalités, imports, terminal, dépôt) et test d'interface
 tools/                 test de la version Linux dans un vrai pseudo-terminal
 ```
@@ -368,6 +392,8 @@ Invoke-Pester -Path tests
 - `tests/Projects.Tests.ps1` : projets (pas, blocs, limite de 3, note de reprise, rappel
   doux, échéances) et actions du quotidien (jours, ajout unique par jour, pas
   d'accumulation au changement de jour).
+- `tests/Cockpit.Tests.ps1` : cockpit flottant (place de la bulle, taille et place du cockpit
+  selon l'écran, réglages).
 - `tests/Terminal.Tests.ps1` : version Linux (largeur des caractères, écrans à toutes les
   tailles, clavier, minuteur, intégration XDG).
 - `tools/test_tui_pty.py` : lance la version Linux dans un vrai pseudo-terminal, la pilote au

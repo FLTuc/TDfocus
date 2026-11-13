@@ -29,6 +29,7 @@ function Get-TdDefaultSettings {
         notionDatabaseId  = ''
         categories        = @(Get-TdDefaultCategories)
         window            = $null
+        cockpit           = (ConvertTo-TdCockpitSettings $null)   # bulle et cockpit flottants (voir Core\Cockpit.ps1)
     }
 }
 
@@ -50,6 +51,7 @@ function ConvertTo-TdSettings {
     if (@('none', 'white', 'pink', 'brown', 'rain', 'chimes') -notcontains $settings.ambient) { $settings.ambient = 'none' }
     if ($settings.defaultMinutes -lt 1) { $settings.defaultMinutes = 25 }
     if ($settings.landingMinutes -lt 0 -or $settings.landingMinutes -gt 15) { $settings.landingMinutes = 2 }
+    $settings.cockpit = ConvertTo-TdCockpitSettings (Get-TdValue $InputObject 'cockpit')
     $cats = foreach ($c in @($settings.categories)) {
         $id = ConvertTo-TdNullableString (Get-TdValue $c 'id')
         if (-not $id) { continue }

@@ -1,0 +1,137 @@
+<!-- TDfocus - le cockpit ouvert.
+     Fenêtre sans bordure, toujours au-dessus des autres (Topmost), thème sombre fixe.
+     Couleurs : fond #16181D, cartes #1F2229, texte #E8EAED, texte secondaire #9AA1AC,
+     tickets #5B9BF0, projets #F0A35B, alerte #F28B82. -->
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TDfocus - Cockpit" Width="420" Height="860"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" WindowStartupLocation="Manual"
+        Foreground="#E8EAED" FontSize="14" UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Window.Resources>
+    <SolidColorBrush x:Key="CkBg" Color="#16181D"/>
+    <SolidColorBrush x:Key="CkCard" Color="#1F2229"/>
+    <SolidColorBrush x:Key="CkText" Color="#E8EAED"/>
+    <SolidColorBrush x:Key="CkMuted" Color="#9AA1AC"/>
+    <SolidColorBrush x:Key="CkTickets" Color="#5B9BF0"/>
+    <SolidColorBrush x:Key="CkProjects" Color="#F0A35B"/>
+    <SolidColorBrush x:Key="CkAlert" Color="#F28B82"/>
+    <SolidColorBrush x:Key="CkLine" Color="#2A2D35"/>
+    <SolidColorBrush x:Key="CkButtonBg" Color="#2A2E37"/>
+
+    <!-- Bouton : au moins 44 px, coins arrondis, contour visible au survol et au clavier. -->
+    <Style x:Key="CkButton" TargetType="Button">
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="MinWidth" Value="44"/>
+      <Setter Property="Background" Value="{StaticResource CkButtonBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource CkText}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12" BorderThickness="2" BorderBrush="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A3F4A"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#5B9BF0"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Carte : bloc de contenu sur fond #1F2229. -->
+    <Style x:Key="CkCardBox" TargetType="Border">
+      <Setter Property="Background" Value="{StaticResource CkCard}"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Padding" Value="14,12"/>
+      <Setter Property="Margin" Value="0,0,0,10"/>
+    </Style>
+
+    <!-- Petit titre de carte, en majuscules. -->
+    <Style x:Key="CkTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Foreground" Value="{StaticResource CkMuted}"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <!-- Barre de défilement fine et discrète (petits écrans). -->
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="8"/>
+      <Setter Property="MinWidth" Value="8"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border Background="#3A3F4A" CornerRadius="4" Margin="1"/>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <!-- Le contour deviendra orange pendant un bloc projet (étape 6). -->
+  <Border x:Name="PanelRoot" Background="{StaticResource CkBg}" BorderBrush="{StaticResource CkLine}" BorderThickness="2"
+          CornerRadius="16" RenderOptions.ClearTypeHint="Enabled">
+    <Grid Margin="14,10,14,12">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- 1. En-tête : date et heure (on déplace le cockpit en le tenant ici) + « réduire en bulle ». -->
+      <Grid x:Name="Header" Background="Transparent" ToolTip="Glisser pour déplacer le cockpit">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,0,0">
+          <TextBlock x:Name="DateText" Text="" FontSize="15" FontWeight="SemiBold"/>
+          <TextBlock x:Name="TimeText" Text="" FontSize="15" Foreground="{StaticResource CkMuted}" Margin="6,0,0,0"/>
+        </StackPanel>
+        <Button x:Name="BtnReduce" Grid.Column="1" Style="{StaticResource CkButton}" Width="44" Height="44" Padding="0"
+                Background="{StaticResource CkCard}" ToolTip="Réduire en bulle" AutomationProperties.Name="Réduire en bulle">
+          <Path Data="M 0 0 L 6 6 L 12 0" Stroke="#9AA1AC" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+        </Button>
+      </Grid>
+
+      <!-- Le reste défile si l'écran est trop petit pour 860 px de haut. -->
+      <ScrollViewer Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <StackPanel x:Name="Body">
+          <!-- Étape 1 : message provisoire. Il sera remplacé par la jauge, les tickets et les projets. -->
+          <Border x:Name="PlaceholderCard" Style="{StaticResource CkCardBox}">
+            <StackPanel>
+              <TextBlock Text="COCKPIT" Style="{StaticResource CkTitle}"/>
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CkText}" FontSize="15" FontWeight="SemiBold"
+                         Text="La bulle et cette fenêtre sont en place."/>
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CkMuted}" Margin="0,6,0,0"
+                         Text="Les tickets, la jauge « Équilibre du jour », les projets et les relances arrivent aux étapes suivantes."/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>
