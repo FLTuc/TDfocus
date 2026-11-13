@@ -227,6 +227,8 @@ pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape
 
 **Étape 2 (disponible)** : les tickets.
 
+![Cockpit, étape 2 : ticket en cours, alerte à 30 min, liste à relancer, bulle](docs/captures/cockpit-tickets.png)
+
 | Je veux… | Je fais |
 |---|---|
 | noter un ticket | **+ Ticket**, un numéro ou un sujet (facultatif), Entrée |
