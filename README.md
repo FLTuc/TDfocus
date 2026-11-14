@@ -228,6 +228,8 @@ ticketing et n'a aucune liste à part.
 | un **bloc projet** | un bloc ajouté ou planifié depuis le panneau Projets |
 | la **prochaine réunion** | la prochaine action à heure fixe (`Point d'équipe 30 @15h30`) |
 
+![Cockpit ouvert, jauge, projets et relances, bulle](docs/captures/cockpit.png)
+
 **La bulle** (84 px) se déplace en la faisant glisser. Elle affiche le nombre d'actions fermées
 aujourd'hui. Contour bleu : le minuteur d'un ticket tourne. Contour orange : un bloc projet est
 en cours. **Pastille orange** : une relance est à faire aujourd'hui. Un clic ouvre le cockpit.
@@ -264,6 +266,8 @@ en cours. **Pastille orange** : une relance est à faire aujourd'hui. Un clic ou
 restant, tâche projet en grand avec sa checklist et la dernière note « Où j'en étais », autres
 projets en résumé, et les tickets réduits à **une ligne** (« Tickets · 7 ouverts · 1 urgent »).
 Le bouton **Interrompre** met le bloc en pause, ouvre la note de reprise et montre les tickets.
+
+![Mode projet, interruption, « Où j'en étais », récap du jour](docs/captures/cockpit-mode-projet.png)
 
 Réglages ▸ Confort : afficher ou masquer la bulle, durée avant l'alerte d'un ticket (1 à 240 min),
 part de temps visée pour les tickets (10 à 90 %). Thème sombre fixe, police Inter fournie.
