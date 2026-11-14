@@ -236,8 +236,9 @@ en cours. **Pastille orange** : une relance est à faire aujourd'hui. Un clic ou
 
 1. **Date, heure** et bouton « réduire en bulle ». On déplace le cockpit par cet en-tête.
 2. **Équilibre du jour**, toujours en haut : barre bleue (tickets) et orange (projets), temps de
-   chaque côté, repère de l'objectif (60 / 40 par défaut). Si un côté passe derrière de plus de
-   10 points, une phrase le dit : « Les projets passent derrière : un bloc de 45 min rééquilibrerait. »
+   chaque côté, repère de l'objectif (60 / 40 par défaut). Après une heure de travail mesuré, si
+   un côté passe derrière de plus de 10 points, une phrase le dit : « Les projets passent
+   derrière : un bloc de 45 min rééquilibrerait. »
 3. **Tickets** : trois tuiles (ouverts, fermés aujourd'hui, à relancer) qui ouvrent leur liste,
    puis le ticket en cours : chrono, barre vers 30 min, **Démarrer / Pause**, **Escalader**, **Fermer**.
    À 30 min : un tintement, puis la barre et le chrono changent de couleur, sans clignoter.
@@ -259,7 +260,7 @@ en cours. **Pastille orange** : une relance est à faire aujourd'hui. Un clic ou
 | revenir en arrière | **Annuler**, proposé quelques secondes après un ajout, une fermeture, une escalade |
 
 **Mode projet.** À l'heure d'un bloc planifié, le cockpit l'annonce (signal doux) et propose
-**Commencer**. Dès qu'un bloc projet est la tâche en cours : bordure et titre orange, temps
+**Commencer** (ou **Reprendre**, si le bloc a été interrompu). Dès qu'un bloc projet est la tâche en cours : bordure et titre orange, temps
 restant, tâche projet en grand avec sa checklist et la dernière note « Où j'en étais », autres
 projets en résumé, et les tickets réduits à **une ligne** (« Tickets · 7 ouverts · 1 urgent »).
 Le bouton **Interrompre** met le bloc en pause, ouvre la note de reprise et montre les tickets.

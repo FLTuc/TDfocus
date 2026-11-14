@@ -208,7 +208,15 @@ function Update-TdCockpitMode {
     if (-not $projectMode) { $due = Get-TdDueProjectBlock -State (Get-TdState) -NowMs $NowMs }
     Set-TdCockpitVisible $panelEls.BlockBanner ($null -ne $due)
     if ($due) {
-        $panelEls.BlockBannerText.Text = $due.fixedStart + ' ' + [char]0x00B7 + ' ' + $due.title + ' (' + (Format-TdDurationMs $due.plannedMs) + ')'
+        # Déjà commencé puis interrompu : on propose de le reprendre.
+        $started = [long]$due.elapsedMs -gt 0
+        $bannerTitle = "C'EST L'HEURE DU BLOC PROJET"
+        $bannerButton = 'Commencer'
+        if ($started) { $bannerTitle = 'BLOC PROJET EN PAUSE'; $bannerButton = 'Reprendre' }
+        $panelEls.BlockBannerTitle.Text = $bannerTitle
+        $panelEls.BtnBlockStart.Content = [string]$bannerButton
+        $panelEls.BlockBannerText.Text = [string]$due.title
+        $panelEls.BlockBannerSlot.Text = Format-TdBlockSlot -Task $due -NowMs $NowMs
         if ($ck.BlockSignalId -ne $due.id) {
             $ck.BlockSignalId = $due.id
             $settings = Get-TdSettings

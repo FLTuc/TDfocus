@@ -155,6 +155,14 @@ function Get-TdNextMeeting {
 
 # ---------------------------------------------------------------- bloc projet
 
+function Format-TdBlockSlot {
+    # Créneau d'un bloc : « 14:00 – 15:30 » s'il est planifié à heure fixe, sinon sa durée (« 25 min »).
+    param([Parameter(Mandatory)]$Task, [long]$NowMs = (Get-TdNowMs))
+    if (-not $Task.fixedStart) { return Format-TdDurationMs $Task.plannedMs }
+    $start = ConvertFrom-TdClockText -Clock $Task.fixedStart -DayMs $NowMs
+    $Task.fixedStart + ' ' + [char]0x2013 + ' ' + (Format-TdClock ([long]$start + [long]$Task.plannedMs))
+}
+
 function Get-TdProjectBlockInfo {
     # Le bloc projet en cours : la tâche en cours de TDfocus, quand c'est un bloc projet (sinon $null).
     #   slotText        « 14:00 – 15:30 » si le bloc est planifié à heure fixe, sinon sa durée (« 25 min »)
@@ -164,11 +172,7 @@ function Get-TdProjectBlockInfo {
     $task = Get-TdCurrentTask $State
     if (-not $task -or -not $task.projectId) { return $null }
     $project = Find-TdProject $Projects $task.projectId
-    $slot = Format-TdDurationMs $task.plannedMs
-    if ($task.fixedStart) {
-        $start = ConvertFrom-TdClockText -Clock $task.fixedStart -DayMs $NowMs
-        $slot = $task.fixedStart + ' ' + [char]0x2013 + ' ' + (Format-TdClock ([long]$start + [long]$task.plannedMs))
-    }
+    $slot = Format-TdBlockSlot -Task $task -NowMs $NowMs
     $remaining = Get-TdRemainingMs $task $NowMs
     $text = 'Reste ' + (Format-TdMinutes ([Math]::Ceiling($remaining / 60000.0)))
     if ($remaining -lt 0) { $text = 'Dépassé de ' + (Format-TdMinutes ([Math]::Ceiling(-$remaining / 60000.0))) }
@@ -215,12 +219,15 @@ function Get-TdWhereWasI {
     param([Parameter(Mandatory)]$State, [AllowNull()][AllowEmptyCollection()]$Projects, [long]$NowMs = (Get-TdNowMs))
     $task = Get-TdCurrentTask $State
     if ($task) {
+        $elapsed = Get-TdElapsedMs $task $NowMs
+        $spent = ''
+        if ($elapsed -ge 60000) { $spent = ', ' + (Format-TdDurationMs $elapsed) + ' passées' }
         $what = 'pas encore commencée'
-        if ($null -ne $task.runningSince) { $what = 'minuteur en marche, ' + (Format-TdDurationMs (Get-TdElapsedMs $task $NowMs)) + ' passées' }
-        elseif ([long]$task.elapsedMs -gt 0) {
-            $what = 'en pause, ' + (Format-TdDurationMs $task.elapsedMs) + ' passées'
+        if ($null -ne $task.runningSince) { $what = 'minuteur en marche' + $spent }
+        elseif ($elapsed -gt 0) {
+            $what = 'en pause' + $spent
             $paused = Get-TdPausedMs $task $NowMs
-            if ($null -ne $paused) { $what = 'en pause ' + (Format-TdPausedFor $paused) + ', ' + (Format-TdDurationMs $task.elapsedMs) + ' passées' }
+            if ($null -ne $paused -and $paused -ge 60000) { $what = 'en pause ' + (Format-TdPausedFor $paused) + $spent }
         }
         [pscustomobject]@{ title = 'En cours : ' + $task.title; text = $what }
         $step = Get-TdCurrentStep $task

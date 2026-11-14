@@ -6,7 +6,7 @@
 # Puis elle le rapproche de l'objectif (60 % de tickets / 40 % de projets par défaut, réglable).
 # Le temps vient du minuteur de TDfocus : chaque tâche garde son temps jour par jour (champ days).
 
-$script:TdBalanceMinTotalMs = 1800000    # pas de message avant 30 min de travail mesuré
+$script:TdBalanceMinTotalMs = 3600000    # pas de message avant 1 h de travail mesuré (le matin, rien n'est encore joué)
 $script:TdBalanceTolerance = 0.10        # écart toléré avec l'objectif : 10 points
 $script:TdBalanceMaxCatchUp = 90         # au-delà de 90 min à rattraper, on ne donne plus de chiffre
 

@@ -164,6 +164,7 @@ Describe 'Bloc projet' {
         $block.fixedStart = $null
         Start-TdTaskNow -State $state -Id $block.id -NowMs $T0
         (Get-TdProjectBlockInfo -State $state -Projects $projects -NowMs $T0).slotText | Should -Be '1 h 30'
+        Format-TdBlockSlot -Task $block -NowMs $T0 | Should -Be '1 h 30'
     }
     It 'repère le bloc planifié dont l''heure est arrivée' {
         Get-TdDueProjectBlock -State $state -NowMs $T0 | Should -BeNullOrEmpty
@@ -197,6 +198,14 @@ Describe '« Où j''en étais » et « Récap du jour »' {
         ($lines | Where-Object { $_.title -eq 'Note' }).text | Should -Be 'Voir avec Paul'
         ($lines | Where-Object { $_.title -eq 'Projet Migration' }).text | Should -Be 'reste à vérifier les alias'
         @(Get-TdWhereWasI -State (New-TdState) -Projects @() -NowMs $T0)[0].title | Should -Be 'Rien en cours'
+        # Pas de « 0 s » ni de « 0 min » : une tâche à peine touchée est simplement « en pause ».
+        $fresh = New-TdState
+        [void](Add-TdTask -State $fresh -Task (New-TdTask -Title 'INC-9' -NowMs $T0) -NowMs $T0)
+        @(Get-TdWhereWasI -State $fresh -Projects @() -NowMs $T0)[0].text | Should -Be 'pas encore commencée'
+        Start-TdTimer $fresh $T0
+        @(Get-TdWhereWasI -State $fresh -Projects @() -NowMs ($T0 + 5000))[0].text | Should -Be 'minuteur en marche'
+        Suspend-TdTimer $fresh ($T0 + 5000)
+        @(Get-TdWhereWasI -State $fresh -Projects @() -NowMs ($T0 + 6000))[0].text | Should -Be 'en pause'
     }
     It 'résume la journée : fermés, temps, escaladés, reste à faire' {
         Start-TdTimer $state $T0

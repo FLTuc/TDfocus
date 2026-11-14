@@ -617,7 +617,7 @@ function Invoke-TdSmokeTest {
     $block = $state.tasks | Where-Object { $_.projectId -eq $site.id } | Select-Object -First 1
     Assert-Td ($null -ne $block -and $block.fixedStart -eq $box.Text -and $block.plannedMs -eq 90 * 60000) "bloc de 1 h 30 planifié à $($box.Text) depuis le panneau Projets"
     if ($state.tasks[0].id -ne $block.id) {
-        Assert-Td ($pe.BlockBanner.IsVisible -and $ck.BlockSignalId -eq $block.id -and $pe.BlockBannerText.Text -like "$($block.fixedStart)*") "à l'heure du bloc : invitation « $($pe.BlockBannerText.Text) »"
+        Assert-Td ($pe.BlockBanner.IsVisible -and $ck.BlockSignalId -eq $block.id -and $pe.BlockBannerText.Text -eq $block.title -and $pe.BlockBannerSlot.Text -like "$($block.fixedStart)*" -and $pe.BtnBlockStart.Content -eq 'Commencer') "à l'heure du bloc : invitation « $($pe.BlockBannerText.Text) $($pe.BlockBannerSlot.Text) »"
         Invoke-TdClick $pe.BtnBlockStart
     }
     else { Start-TdTaskNowById -Id $block.id }
@@ -650,6 +650,7 @@ function Invoke-TdSmokeTest {
     Invoke-TdClick (Find-TdDescendant $pe.TicketList { param($n) $n -is [System.Windows.Controls.Button] -and $n.Tag -eq "start|$($inc3.id)" })
     Wait-TdUi 300
     Assert-Td ($state.tasks[0].id -eq $inc3.id -and -not $pe.ProjectModeCard.IsVisible -and $pe.TicketsCard.IsVisible -and $pe.PanelRoot.BorderBrush.Color.ToString() -ne '#FFF0A35B') 'on traite le ticket : retour au mode normal'
+    Assert-Td ($pe.BlockBanner.IsVisible -and $pe.BlockBannerTitle.Text -eq 'BLOC PROJET EN PAUSE' -and $pe.BtnBlockStart.Content -eq 'Reprendre') 'le bloc interrompu reste à portée : « Reprendre »'
     Invoke-TdClick $pe.BtnTicketToggle
 
     # Jauge avec l'exemple de la maquette : 2 h 40 de tickets, 1 h 05 de projets

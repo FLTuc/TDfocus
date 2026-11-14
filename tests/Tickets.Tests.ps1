@@ -301,11 +301,11 @@ Describe 'Jauge « Équilibre du jour »' {
         $block.days['2026-11-13'] = 40 * $Min
         (Get-TdDayBalance -State $state -NowMs $T0).message | Should -Be 'Les tickets passent derrière : 40 min de tickets rééquilibreraient.'
     }
-    It 'se tait près de l''objectif, et avant 30 min de travail mesuré' {
+    It 'se tait près de l''objectif, et avant 1 h de travail mesuré' {
         $ticket.days['2026-11-13'] = 65 * $Min
         $block.days['2026-11-13'] = 35 * $Min
         (Get-TdDayBalance -State $state -NowMs $T0).behind | Should -BeNullOrEmpty
-        $ticket.days['2026-11-13'] = 25 * $Min
+        $ticket.days['2026-11-13'] = 55 * $Min
         $block.days['2026-11-13'] = 0
         $b = Get-TdDayBalance -State $state -NowMs $T0
         $b.ticketRatio | Should -Be 1

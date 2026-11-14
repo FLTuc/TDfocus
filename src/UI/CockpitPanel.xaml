@@ -298,8 +298,9 @@
                 <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="C'EST L'HEURE DU BLOC PROJET" FontSize="11" FontWeight="Bold" Foreground="{StaticResource CkProjects}"/>
+                <TextBlock x:Name="BlockBannerTitle" Text="C'EST L'HEURE DU BLOC PROJET" FontSize="11" FontWeight="Bold" Foreground="{StaticResource CkProjects}"/>
                 <TextBlock x:Name="BlockBannerText" Text="" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                <TextBlock x:Name="BlockBannerSlot" Text="" FontSize="12" Foreground="{StaticResource CkMuted}"/>
               </StackPanel>
               <Button x:Name="BtnBlockStart" Grid.Column="1" Style="{StaticResource CkButton}" Content="Commencer" Margin="8,0,0,0"
                       Background="{StaticResource CkProjects}" Foreground="#16181D" ToolTip="Le bloc projet devient la tâche en cours de TDfocus"/>

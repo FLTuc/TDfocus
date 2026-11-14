@@ -154,6 +154,11 @@ function Update-TdUpNext {
     if ($parked -gt 0) {
         $ui.ParkedBar.Visibility = 'Visible'
         $ui.ParkedText.Text = $(if ($parked -gt 1) { "$parked tâches reportées à demain" } else { '1 tâche reportée à demain' })
+        # Tickets escaladés depuis le cockpit : ils attendent quelqu'un et reviendront le jour de la relance.
+        $waiting = @($state.parked | Where-Object { $null -ne $_.waitingSince }).Count
+        if ($waiting -gt 0) {
+            $ui.ParkedText.Text = $(if ($parked -gt 1) { "$parked tâches mises de côté (dont $waiting à relancer)" } else { '1 tâche mise de côté, à relancer' })
+        }
     }
     else { $ui.ParkedBar.Visibility = 'Collapsed' }
     $nudge = $null
