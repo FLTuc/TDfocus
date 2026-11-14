@@ -79,11 +79,6 @@ function Initialize-TdApp {
     $now = Get-TdNowMs
     $state = $script:Td.Data.state
     $paused = Repair-TdStaleTimer -State $state -NowMs $now
-    # Tickets du cockpit : même précaution pour leur chrono, et on oublie les très vieux tickets fermés.
-    $tickets = $script:Td.Data.tickets
-    $ticketPaused = Repair-TdStaleTicket -Store $tickets -LastSeenMs ([long]$state.lastSeenMs) -NowMs $now
-    $ticketsRemoved = Limit-TdTickets -Store $tickets -NowMs $now
-    if ($null -ne $ticketPaused -or $ticketsRemoved -gt 0) { Save-TdTickets $tickets }
     [void](Invoke-TdDayRollover -State $state -NowMs $now)
     $dailyAdded = Sync-TdDailyTasks -State $state -Daily $script:Td.Data.daily -NowMs $now
     Sync-TdState $state $now
@@ -188,7 +183,7 @@ function Add-TdTaskFromInput {
         }
     }
     $now = Get-TdNowMs
-    $task = New-TdTask -Title $parsed.title -Minutes ([double]$minutes) -CategoryId $script:Td.AddCategory -FixedStart $fixed -NowMs $now
+    $task = New-TdTask -Title $parsed.title -Minutes ([double]$minutes) -CategoryId $script:Td.AddCategory -FixedStart $fixed -Urgent:([bool]$parsed.urgent) -NowMs $now
     Add-TdTask -State (Get-TdState) -Task $task -NowMs $now
     $ui.NewTaskBox.Text = ''
     $ui.FixedTimeBox.Text = ''
@@ -646,6 +641,8 @@ function Update-TdView {
     Update-TdCompact -NowMs $now -Schedule $schedule
     Update-TdTrayMenu
     if ($script:Td.Drawer -eq 'stats') { Update-TdDrawer }
+    # Le cockpit lit la même liste : il suit chaque changement.
+    Update-TdCockpit -NowMs $now -Force
 }
 
 function Get-TdStructureKey {
@@ -653,7 +650,7 @@ function Get-TdStructureKey {
     param($Schedule)
     $state = Get-TdState
     $parts = foreach ($t in $state.tasks) {
-        '{0}:{1}:{2}:{3}:{4}:{5}' -f $t.id, $t.title, $t.plannedMs, $t.categoryId, $t.fixedStart, (@($t.steps | Where-Object { $_.done }).Count)
+        '{0}:{1}:{2}:{3}:{4}:{5}:{6}{7}' -f $t.id, $t.title, $t.plannedMs, $t.categoryId, $t.fixedStart, (@($t.steps | Where-Object { $_.done }).Count), [int][bool]$t.urgent, [int]($null -ne $t.waitingSince)
     }
     $flags = foreach ($it in $Schedule.items) { '{0}{1}' -f [int]($it.gapMs -ge 60000), [int]($it.lateMs -gt 0) }
     ($parts -join '|') + '#' + ($flags -join '') + '#' + $script:Td.EditingId + '#' + $state.done.Count + '#' + $state.parked.Count

@@ -8,7 +8,7 @@
 $script:TdTaskFields = @(
     'id', 'title', 'plannedMs', 'estimateMs', 'categoryId', 'elapsedMs', 'runningSince',
     'startedAt', 'completedAt', 'fixedStart', 'note', 'source', 'externalId', 'createdAt',
-    'steps', 'pausedAt', 'deferUntil', 'projectId', 'dailyId'
+    'steps', 'pausedAt', 'deferUntil', 'projectId', 'dailyId', 'urgent', 'waitingSince', 'days'
 )
 
 function New-TdId {
@@ -40,6 +40,19 @@ function ConvertTo-TdNullableString {
     $s = [string]$Value
     if ($s.Trim() -eq '') { return $null }
     $s
+}
+
+function ConvertTo-TdDayTimes {
+    # Temps passé jour par jour : table « 2026-11-13 » -> millisecondes (lue depuis le JSON ou une table).
+    param($Value)
+    $days = @{}
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Value.Keys)) { if ("$key" -match '^\d{4}-\d{2}-\d{2}$') { $days["$key"] = [long]$Value[$key] } }
+    }
+    elseif ($Value -is [System.Management.Automation.PSCustomObject]) {
+        foreach ($p in $Value.PSObject.Properties) { if ($p.Name -match '^\d{4}-\d{2}-\d{2}$') { $days[$p.Name] = [long]$p.Value } }
+    }
+    $days
 }
 
 function ConvertTo-TdSteps {
@@ -100,6 +113,9 @@ function ConvertTo-TdTask {
         deferUntil   = ConvertTo-TdNullableString (Get-TdValue $InputObject 'deferUntil')
         projectId    = ConvertTo-TdNullableString (Get-TdValue $InputObject 'projectId')   # bloc d'un projet
         dailyId      = ConvertTo-TdNullableString (Get-TdValue $InputObject 'dailyId')     # action du quotidien
+        urgent       = [bool](Get-TdValue $InputObject 'urgent')                           # saisie avec « !! » : passe avant les autres
+        waitingSince = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'waitingSince')  # escaladée : en attente de quelqu'un, à relancer
+        days         = ConvertTo-TdDayTimes (Get-TdValue $InputObject 'days')              # temps passé jour par jour (jauge du cockpit)
     }
 }
 
@@ -113,6 +129,7 @@ function New-TdTask {
         [string]$ExternalId,
         [string]$Note = '',
         [string[]]$Steps = @(),
+        [switch]$Urgent,
         [long]$NowMs = (Get-TdNowMs)
     )
     if ($Minutes -lt 1) { $Minutes = 1 }
@@ -128,6 +145,7 @@ function New-TdTask {
         note       = $Note
         createdAt  = $NowMs
         steps      = @($Steps)
+        urgent     = [bool]$Urgent
     }
 }
 
@@ -214,11 +232,41 @@ function Test-TdRunning {
     ($State.tasks.Count -gt 0) -and ($null -ne $State.tasks[0].runningSince)
 }
 
+function Add-TdTaskDayTime {
+    # Range une période de travail dans le bon jour (coupée à minuit si elle chevauche deux jours).
+    param([Parameter(Mandatory)]$Task, [long]$FromMs, [long]$ToMs)
+    if ($null -eq $Task.days) { return }    # objet sans suivi par jour (anciennes données)
+    $cursor = $FromMs
+    while ($cursor -lt $ToMs) {
+        $midnight = ConvertFrom-TdLocalDate ((ConvertTo-TdLocalDate $cursor).Date.AddDays(1))
+        $end = [Math]::Min($ToMs, [long]$midnight)
+        if ($end -le $cursor) { break }
+        $key = Get-TdDayKey $cursor
+        $Task.days[$key] = [long]$Task.days[$key] + ($end - $cursor)
+        $cursor = $end
+    }
+}
+
+function Get-TdTaskTodayMs {
+    # Temps passé aujourd'hui sur une tâche, minuteur en marche compris.
+    param([Parameter(Mandatory)]$Task, [Parameter(Mandatory)][long]$NowMs)
+    $total = [long]0
+    if ($null -ne $Task.days) { $total = [long]$Task.days[(Get-TdDayKey $NowMs)] }
+    if ($null -ne $Task.runningSince) {
+        $from = [Math]::Max([long]$Task.runningSince, [long](Get-TdDayStartMs $NowMs))
+        $total += [Math]::Max([long]0, $NowMs - $from)
+    }
+    $total
+}
+
 function Stop-TdTaskClock {
-    # Fige le temps écoulé d'une tâche (sans la terminer).
+    # Fige le temps écoulé d'une tâche (sans la terminer) et le range dans le bon jour.
     param([Parameter(Mandatory)]$Task, [Parameter(Mandatory)][long]$NowMs)
     if ($null -ne $Task.runningSince) {
-        $Task.elapsedMs = [long]$Task.elapsedMs + [Math]::Max([long]0, $NowMs - [long]$Task.runningSince)
+        $from = [long]$Task.runningSince
+        $to = [Math]::Max($from, $NowMs)
+        $Task.elapsedMs = [long]$Task.elapsedMs + ($to - $from)
+        Add-TdTaskDayTime -Task $Task -FromMs $from -ToMs $to
         $Task.runningSince = $null
     }
 }
@@ -296,9 +344,19 @@ function Switch-TdTimer {
     if (Test-TdRunning $State) { Suspend-TdTimer $State $NowMs } else { Start-TdTimer $State $NowMs }
 }
 
+function Get-TdUrgentInsertIndex {
+    # Place d'une tâche urgente : juste après la tâche en cours et les urgentes déjà en attente.
+    param([Parameter(Mandatory)]$State)
+    if ($State.tasks.Count -eq 0) { return 0 }
+    $index = 1
+    while ($index -lt $State.tasks.Count -and $State.tasks[$index].urgent) { $index++ }
+    $index
+}
+
 function Add-TdTask {
     # Ajoute une tâche. Une tâche à heure fixe (créneau figé) est insérée à sa place
-    # chronologique sans jamais déloger la tâche en cours ; une tâche flottante va en fin de file.
+    # chronologique sans jamais déloger la tâche en cours ; une tâche urgente (« !! ») passe
+    # juste après la tâche en cours ; une tâche flottante va en fin de file.
     param(
         [Parameter(Mandatory)]$State,
         [Parameter(Mandatory)]$Task,
@@ -307,6 +365,7 @@ function Add-TdTask {
     )
     if ($Index -lt 0) {
         if ($Task.fixedStart) { $Index = Get-TdFixedInsertIndex -State $State -Clock $Task.fixedStart -NowMs $NowMs }
+        elseif ($Task.urgent) { $Index = Get-TdUrgentInsertIndex -State $State }
         else { $Index = $State.tasks.Count }
     }
     if ($Index -gt $State.tasks.Count) { $Index = $State.tasks.Count }

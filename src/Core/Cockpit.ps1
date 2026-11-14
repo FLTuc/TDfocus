@@ -18,19 +18,23 @@ function ConvertTo-TdCockpitNumber {
 
 function ConvertTo-TdCockpitSettings {
     # Réglages du cockpit (dans settings.json) : affiché ou masqué, ouvert ou en bulle, place de la bulle,
-    # durée avant l'alerte d'un ticket.
+    # durée avant l'alerte d'un ticket, objectif de la jauge.
     param($InputObject)
     $enabled = Get-TdValue $InputObject 'enabled'
     if ($null -eq $enabled) { $enabled = $true }    # la bulle est visible par défaut
     # Alerte douce quand un ticket dépasse cette durée : 30 min par défaut, de 1 min à 4 h.
     $alert = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'ticketAlertMinutes')
     if ($null -eq $alert -or $alert -lt 1 -or $alert -gt 240) { $alert = 30 }
+    # Jauge « Équilibre du jour » : part de tickets visée, en % (60 = « 60 / 40 »), de 10 à 90.
+    $share = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'ticketShare')
+    if ($null -eq $share -or $share -lt 10 -or $share -gt 90) { $share = 60 }
     [ordered]@{
         enabled            = [bool]$enabled
         open               = [bool](Get-TdValue $InputObject 'open')
         left               = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'left')
         top                = ConvertTo-TdCockpitNumber (Get-TdValue $InputObject 'top')
         ticketAlertMinutes = [int][Math]::Round($alert)
+        ticketShare        = [int][Math]::Round($share)
     }
 }
 

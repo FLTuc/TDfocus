@@ -52,7 +52,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Windows.Forms, System.Drawing
 
 . (Join-Path $PSScriptRoot 'TDfocus.Core.ps1')
-foreach ($part in @('Audio\Synth', 'Audio\Player', 'Platform\Windows', 'Platform\Integrations', 'UI\Theme', 'UI\Helpers', 'UI\App', 'UI\Rows', 'UI\Drawers', 'UI\Projects', 'UI\Cockpit', 'UI\CockpitTickets', 'UI\Tray')) {
+foreach ($part in @('Audio\Synth', 'Audio\Player', 'Platform\Windows', 'Platform\Integrations', 'UI\Theme', 'UI\Helpers', 'UI\App', 'UI\Rows', 'UI\Drawers', 'UI\Projects', 'UI\Cockpit', 'UI\CockpitTickets', 'UI\CockpitProjects', 'UI\Tray')) {
     . (Join-Path $PSScriptRoot "$part.ps1")
 }
 

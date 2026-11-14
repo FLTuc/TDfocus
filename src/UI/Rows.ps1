@@ -215,9 +215,12 @@ function New-TdTaskRow {
     $r.EndTime.Text = Format-TdClock $Item.endMs
 
     $subParts = @()
-    $badge = ''
-    if ($project) { $badge = 'bloc projet' }
-    elseif ($Task.dailyId) { $badge = [string][char]0x21BB + ' quotidien' }
+    $badges = @()
+    if ($project) { $badges += 'bloc projet' }
+    elseif ($Task.dailyId) { $badges += [string][char]0x21BB + ' quotidien' }
+    if ($Task.urgent) { $badges += 'urgent' }                        # saisie avec « !! »
+    if ($null -ne $Task.waitingSince) { $badges += 'à relancer' }    # ticket escaladé revenu dans la liste
+    $badge = $badges -join ' · '
     if ($badge) { $subParts += $badge }
     if ($Task.fixedStart) {
         if ($Item.lateMs -gt 0) {

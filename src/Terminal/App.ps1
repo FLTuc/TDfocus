@@ -139,7 +139,7 @@ function Add-TdTuiTaskFromText {
     $minutes = $parsed.minutes
     if (-not $minutes) { $minutes = $script:Tui.Data.settings.defaultMinutes }
     $now = Get-TdNowMs
-    $task = New-TdTask -Title $parsed.title -Minutes ([double]$minutes) -FixedStart $parsed.fixedStart -NowMs $now
+    $task = New-TdTask -Title $parsed.title -Minutes ([double]$minutes) -FixedStart $parsed.fixedStart -Urgent:([bool]$parsed.urgent) -NowMs $now
     Add-TdTask -State $script:Tui.Data.state -Task $task -NowMs $now
     Complete-TdTuiChange -Replan
     $fixed = ''

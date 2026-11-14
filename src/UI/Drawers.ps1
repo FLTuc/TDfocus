@@ -1049,23 +1049,9 @@ function Build-TdSettingsPanel {
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Bulle Cockpit toujours au-dessus des autres fenêtres' -Checked ([bool]$settings.cockpit.enabled) -ToolTip 'Petite bulle flottante pour le helpdesk et les projets. Un clic l''ouvre, on la déplace en la faisant glisser.' -OnChange {
                 if ($this.IsChecked) { Show-TdCockpit } else { Hide-TdCockpit }
             }))
-    # Cockpit : durée avant l'alerte douce d'un ticket (30 min par défaut).
-    $alertRow = New-Object System.Windows.Controls.StackPanel
-    $alertRow.Orientation = [System.Windows.Controls.Orientation]::Horizontal
-    $alertRow.Margin = New-Object System.Windows.Thickness 2, 0, 0, 8
-    $alertText = New-TdText -Text 'Cockpit : alerte douce quand un ticket dépasse' -Size 13
-    $alertText.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
-    [void]$alertRow.Children.Add($alertText)
-    $alertBox = New-TdTextBox -Text ([string]$settings.cockpit.ticketAlertMinutes) -Margin '8,0,6,0' -Width 52
-    $alertBox.TextAlignment = [System.Windows.TextAlignment]::Center
-    $alertBox.ToolTip = 'De 1 à 240 minutes'
-    $alertBox.Add_LostFocus({ Set-TdTicketAlertMinutes -Box $this })
-    $alertBox.Add_KeyDown({ param($s, $e) if ($e.Key -eq [System.Windows.Input.Key]::Return) { Set-TdTicketAlertMinutes -Box $s } })
-    [void]$alertRow.Children.Add($alertBox)
-    $alertUnit = New-TdText -Text 'min' -Size 13
-    $alertUnit.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
-    [void]$alertRow.Children.Add($alertUnit)
-    [void]$Panel.Children.Add($alertRow)
+    # Cockpit : durée avant l'alerte douce d'un ticket, et objectif de la jauge « Équilibre du jour ».
+    [void]$Panel.Children.Add((New-TdCockpitNumberRow -Label 'Cockpit : alerte douce quand un ticket dépasse' -Unit 'min' -Key 'ticketAlertMinutes' -Min 1 -Max 240))
+    [void]$Panel.Children.Add((New-TdCockpitNumberRow -Label 'Cockpit : part de temps visée pour les tickets' -Unit '% (le reste pour les projets)' -Key 'ticketShare' -Min 10 -Max 90))
     [void]$Panel.Children.Add((New-TdSwitch -Label 'Mode compact toujours au premier plan' -Checked $settings.compactTopmost -OnChange {
                 (Get-TdSettings).compactTopmost = [bool]$this.IsChecked
                 Save-TdSettingsNow
@@ -1178,19 +1164,43 @@ function Update-TdCategoryField {
     Update-TdView
 }
 
-function Set-TdTicketAlertMinutes {
-    # Réglages : durée (en minutes) avant l'alerte d'un ticket. Une valeur illisible est refusée.
+function New-TdCockpitNumberRow {
+    # Réglages : une ligne « texte [nombre] unité » pour un réglage du cockpit (settings.cockpit.<Key>).
+    param([Parameter(Mandatory)][string]$Label, [string]$Unit, [Parameter(Mandatory)][string]$Key, [int]$Min, [int]$Max)
+    $row = New-Object System.Windows.Controls.StackPanel
+    $row.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+    $row.Margin = New-Object System.Windows.Thickness 2, 0, 0, 8
+    $text = New-TdText -Text $Label -Size 13
+    $text.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    [void]$row.Children.Add($text)
+    $box = New-TdTextBox -Text ([string](Get-TdSettings).cockpit[$Key]) -Margin '8,0,6,0' -Width 52
+    $box.TextAlignment = [System.Windows.TextAlignment]::Center
+    $box.ToolTip = "De $Min à $Max"
+    $box.Tag = [string]"$Key|$Min|$Max"
+    $box.Add_LostFocus({ Set-TdCockpitNumber -Box $this })
+    $box.Add_KeyDown({ param($s, $e) if ($e.Key -eq [System.Windows.Input.Key]::Return) { Set-TdCockpitNumber -Box $s } })
+    [void]$row.Children.Add($box)
+    $unitText = New-TdText -Text $Unit -Size 13
+    $unitText.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    [void]$row.Children.Add($unitText)
+    $row
+}
+
+function Set-TdCockpitNumber {
+    # Enregistre le nombre saisi (Tag du champ : « réglage|minimum|maximum »). Une valeur illisible est refusée.
     param([Parameter(Mandatory)]$Box)
+    $parts = ([string]$Box.Tag).Split('|')
+    $key = $parts[0]
     $cockpit = (Get-TdSettings).cockpit
-    $minutes = 0
-    if ([int]::TryParse(([string]$Box.Text).Trim(), [ref]$minutes) -and $minutes -ge 1 -and $minutes -le 240) {
-        if ($minutes -ne [int]$cockpit.ticketAlertMinutes) {
-            $cockpit.ticketAlertMinutes = $minutes
+    $value = 0
+    if ([int]::TryParse(([string]$Box.Text).Trim(), [ref]$value) -and $value -ge [int]$parts[1] -and $value -le [int]$parts[2]) {
+        if ($value -ne [int]$cockpit[$key]) {
+            $cockpit[$key] = $value
             Save-TdSettingsNow
             Update-TdCockpit -NowMs (Get-TdNowMs) -Force
         }
     }
-    $Box.Text = [string]$cockpit.ticketAlertMinutes
+    $Box.Text = [string]$cockpit[$key]
 }
 
 function Export-TdBackupNow {
@@ -1224,8 +1234,6 @@ function Import-TdBackupNow {
         Save-TdCheckIns $restored.checkins
         Save-TdProjects $restored.projects
         Save-TdDaily $restored.daily
-        Save-TdTickets $restored.tickets
-        Update-TdCockpit -NowMs $now -Force
         Update-TdThemeNow
         Build-TdAddBarChips
         Set-TdAmbient -Name $restored.settings.ambient -Volume $restored.settings.ambientVolume

@@ -143,6 +143,44 @@
       </Setter>
     </Style>
 
+    <!-- Case à cocher de la checklist : une ligne d'au moins 44 px ; la case se remplit d'orange une fois cochée. -->
+    <Style x:Key="CkCheck" TargetType="CheckBox">
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Foreground" Value="{StaticResource CkText}"/>
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Border x:Name="Row" Background="Transparent" CornerRadius="8" BorderThickness="2" BorderBrush="Transparent" Padding="2,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Box" Width="22" Height="22" CornerRadius="6" BorderThickness="2" BorderBrush="#9AA1AC" Background="Transparent" VerticalAlignment="Center">
+                  <Path x:Name="Mark" Data="M 0 5 L 4 9 L 11 1" Stroke="#16181D" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        StrokeLineJoin="Round" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                </Border>
+                <ContentPresenter Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="{StaticResource CkProjects}"/>
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource CkProjects}"/>
+                <Setter TargetName="Mark" Property="Visibility" Value="Visible"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Row" Property="BorderBrush" Value="#E8EAED"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <!-- Carte : bloc de contenu sur fond #1F2229. -->
     <Style x:Key="CkCardBox" TargetType="Border">
       <Setter Property="Background" Value="{StaticResource CkCard}"/>
@@ -191,6 +229,7 @@
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
       <!-- 1. En-tête : date et heure (on déplace le cockpit en le tenant ici) + « réduire en bulle ». -->
@@ -210,22 +249,143 @@
       </Grid>
 
       <!-- Le reste défile si l'écran est trop petit pour 860 px de haut. -->
-      <ScrollViewer Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+      <ScrollViewer x:Name="BodyScroll" Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
         <StackPanel x:Name="Body">
-          <!-- 3. Tickets : ajout, trois tuiles, ticket en cours avec son chrono, listes. -->
+          <!-- 2. Jauge « Équilibre du jour » : toujours en haut. Temps d'aujourd'hui, tickets en bleu, projets en orange. -->
+          <Border x:Name="BalanceCard" Style="{StaticResource CkCardBox}">
+            <StackPanel>
+              <Grid Margin="0,0,0,8">
+                <TextBlock Text="ÉQUILIBRE DU JOUR" Style="{StaticResource CkTitle}" Margin="0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="BalanceTarget" Text="objectif 60 / 40" FontSize="12" Foreground="{StaticResource CkMuted}" HorizontalAlignment="Right"
+                           VerticalAlignment="Center" ToolTip="Part visée : tickets / projets. Elle se règle dans TDfocus : Réglages, Confort."/>
+              </Grid>
+              <Grid Height="18">
+                <Border Height="10" Background="{StaticResource CkLine}" CornerRadius="5" VerticalAlignment="Center"/>
+                <!-- Les deux parts : le code règle la largeur des colonnes. -->
+                <Grid x:Name="BalanceBar" Height="10" VerticalAlignment="Center" Visibility="Collapsed">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="BalanceTicketsCol" Width="1*"/>
+                    <ColumnDefinition x:Name="BalanceProjectsCol" Width="1*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border x:Name="BalanceTicketsFill" Background="{StaticResource CkTickets}" CornerRadius="5,0,0,5"/>
+                  <Border x:Name="BalanceProjectsFill" Grid.Column="1" Background="{StaticResource CkProjects}" CornerRadius="0,5,5,0"/>
+                </Grid>
+                <!-- Repère de l'objectif : un trait clair, placé par le code. -->
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="BalanceMarkLeft" Width="60*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition x:Name="BalanceMarkRight" Width="40*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border Grid.Column="1" Width="3" Background="{StaticResource CkText}" CornerRadius="1.5"/>
+                </Grid>
+              </Grid>
+              <Grid Margin="0,6,0,0">
+                <TextBlock x:Name="BalanceTicketsText" Text="Tickets 0 min" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource CkTickets}"/>
+                <TextBlock x:Name="BalanceProjectsText" Text="Projets 0 min" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource CkProjects}"
+                           HorizontalAlignment="Right"/>
+              </Grid>
+              <!-- Phrase affichée seulement si un côté passe derrière. -->
+              <TextBlock x:Name="BalanceMessage" Text="" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Bloc projet planifié dont l'heure est arrivée : une invitation, sans rien forcer. -->
+          <Border x:Name="BlockBanner" Style="{StaticResource CkCardBox}" BorderBrush="{StaticResource CkProjects}" BorderThickness="2" Visibility="Collapsed">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="C'EST L'HEURE DU BLOC PROJET" FontSize="11" FontWeight="Bold" Foreground="{StaticResource CkProjects}"/>
+                <TextBlock x:Name="BlockBannerText" Text="" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+              </StackPanel>
+              <Button x:Name="BtnBlockStart" Grid.Column="1" Style="{StaticResource CkButton}" Content="Commencer" Margin="8,0,0,0"
+                      Background="{StaticResource CkProjects}" Foreground="#16181D" ToolTip="Le bloc projet devient la tâche en cours de TDfocus"/>
+            </Grid>
+          </Border>
+
+          <!-- Mode projet : affiché quand la tâche en cours de TDfocus est un bloc projet. -->
+          <Border x:Name="ProjectModeCard" Style="{StaticResource CkCardBox}" Visibility="Collapsed">
+            <StackPanel>
+              <TextBlock x:Name="BlockSlot" Text="BLOC PROJET" FontSize="11" FontWeight="Bold" Foreground="{StaticResource CkProjects}"/>
+              <TextBlock x:Name="BlockName" Text="" FontSize="22" FontWeight="Bold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+              <TextBlock x:Name="BlockRemaining" Text="" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource CkProjects}" Margin="0,2,0,0"/>
+              <Grid Height="6" Margin="0,8,0,0">
+                <Border Background="{StaticResource CkLine}" CornerRadius="3"/>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="BlockBarDone" Width="0*"/>
+                    <ColumnDefinition x:Name="BlockBarLeft" Width="1*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border x:Name="BlockBarFill" Background="{StaticResource CkProjects}" CornerRadius="3"/>
+                </Grid>
+              </Grid>
+              <TextBlock Text="TÂCHE EN COURS" Style="{StaticResource CkTitle}" Margin="0,14,0,4"/>
+              <TextBlock x:Name="BlockStep" Text="" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+              <!-- Checklist : les pas du bloc (remplie par le code). -->
+              <StackPanel x:Name="BlockChecklist" Margin="0,6,0,0"/>
+              <Border x:Name="BlockCrumbBox" Background="{StaticResource CkBg}" CornerRadius="10" Padding="12,10" Margin="0,8,0,0">
+                <TextBlock TextWrapping="Wrap"><Run Text="Où j'en étais : " FontWeight="SemiBold" Foreground="{StaticResource CkProjects}"/><Run x:Name="BlockCrumb" Text=""/></TextBlock>
+              </Border>
+              <!-- Note de reprise : ouverte par « Interrompre ». -->
+              <StackPanel x:Name="BlockNoteForm" Visibility="Collapsed" Margin="0,10,0,0">
+                <TextBlock Text="Note de reprise : où t'arrêtes-tu, et que voulais-tu faire ensuite ?" Foreground="{StaticResource CkMuted}" FontSize="12"
+                           TextWrapping="Wrap" Margin="0,0,0,4"/>
+                <TextBox x:Name="BlockNoteBox" Style="{StaticResource CkField}" MaxLength="300" AutomationProperties.Name="Note de reprise du projet"/>
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Button x:Name="BtnNoteSkip" Style="{StaticResource CkButton}" Content="Sans note" Padding="4,0"/>
+                  <Button x:Name="BtnNoteSave" Grid.Column="2" Style="{StaticResource CkButton}" Content="Enregistrer la note" Padding="4,0"
+                          Background="{StaticResource CkProjects}" Foreground="#16181D"/>
+                </Grid>
+              </StackPanel>
+              <Grid x:Name="BlockButtons" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="BtnBlockToggle" Style="{StaticResource CkButton}" Content="Pause" Padding="4,0"/>
+                <Button x:Name="BtnBlockStep" Grid.Column="2" Style="{StaticResource CkButton}" Content="Étape faite" Padding="4,0"
+                        Background="{StaticResource CkProjects}" Foreground="#16181D"/>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- Pendant un bloc projet, les tickets tiennent en UNE ligne. -->
+          <Border x:Name="TicketsLine" Style="{StaticResource CkCardBox}" Visibility="Collapsed">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="15"><Run Text="Tickets" FontWeight="SemiBold" Foreground="{StaticResource CkTickets}"/><Run x:Name="TicketsLineText" Text=""/><Run x:Name="TicketsLineUrgent" Text="" Foreground="{StaticResource CkAlert}"/></TextBlock>
+              <Button x:Name="BtnInterrupt" Grid.Column="1" Style="{StaticResource CkButton}" Content="Interrompre" Margin="8,0,0,0"
+                      ToolTip="Met le bloc projet en pause, ouvre la note de reprise et montre les tickets"/>
+            </Grid>
+          </Border>
+
+          <!-- 3. Tickets : les actions de la liste TDfocus (sauf blocs projet et pauses). -->
           <Border x:Name="TicketsCard" Style="{StaticResource CkCardBox}">
             <StackPanel>
               <Grid Margin="0,0,0,8">
                 <TextBlock Text="TICKETS" Style="{StaticResource CkTitle}" Margin="0" VerticalAlignment="Center"/>
                 <Button x:Name="BtnAddTicket" Style="{StaticResource CkButton}" HorizontalAlignment="Right" Content="+ Ticket"
-                        ToolTip="Ajouter un ticket" AutomationProperties.Name="Ajouter un ticket"/>
+                        ToolTip="Ajouter une action à ta liste TDfocus" AutomationProperties.Name="Ajouter un ticket à la liste TDfocus"/>
               </Grid>
 
               <!-- Formulaire d'ajout : replié tant qu'on n'a pas cliqué « + Ticket ». -->
               <StackPanel x:Name="AddForm" Visibility="Collapsed" Margin="0,0,0,10">
                 <Grid>
-                  <TextBox x:Name="TicketBox" Style="{StaticResource CkField}" MaxLength="80" AutomationProperties.Name="Numéro ou sujet du ticket"/>
-                  <TextBlock x:Name="TicketBoxHint" Text="N° ou sujet (facultatif), puis Entrée" Foreground="{StaticResource CkMuted}"
+                  <TextBox x:Name="TicketBox" Style="{StaticResource CkField}" MaxLength="120" AutomationProperties.Name="Action à ajouter à la liste TDfocus"
+                           ToolTip="Même saisie que dans TDfocus : un titre, une durée en minutes si tu veux. L'action rejoint ta liste TDfocus."/>
+                  <TextBlock x:Name="TicketBoxHint" Text="ex. « INC-4821 VPN 20 », puis Entrée" Foreground="{StaticResource CkMuted}"
                              Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
                 <Grid Margin="0,8,0,0">
@@ -251,7 +411,7 @@
                   <ColumnDefinition Width="8"/>
                   <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="TileOpen" Style="{StaticResource CkTile}" ToolTip="Tickets ouverts : cliquer pour voir la liste">
+                <Button x:Name="TileOpen" Style="{StaticResource CkTile}" ToolTip="Actions de ta liste TDfocus (sauf blocs projet et pauses) : cliquer pour voir la liste">
                   <StackPanel>
                     <TextBlock x:Name="TileOpenCount" Text="0" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
                                LineHeight="30" LineStackingStrategy="BlockLineHeight"/>
@@ -294,11 +454,16 @@
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock x:Name="CurrentRef" Text="" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                   <Border x:Name="CurrentUrgent" Grid.Column="1" Background="{StaticResource CkAlert}" CornerRadius="6" Padding="7,2" Margin="8,0,0,0"
                           VerticalAlignment="Center" Visibility="Collapsed">
                     <TextBlock Text="URGENT" FontSize="10" FontWeight="Bold" Foreground="#16181D"/>
+                  </Border>
+                  <Border x:Name="CurrentWaiting" Grid.Column="2" Background="{StaticResource CkProjects}" CornerRadius="6" Padding="7,2" Margin="8,0,0,0"
+                          VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock Text="À RELANCER" FontSize="10" FontWeight="Bold" Foreground="#16181D"/>
                   </Border>
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -333,7 +498,7 @@
                           ToolTip="Ticket résolu : il compte dans « fermés aujourd'hui »"/>
                 </Grid>
               </StackPanel>
-              <TextBlock x:Name="NoTicketText" Text="Aucun ticket en cours. « + Ticket » pour en ajouter un." Foreground="{StaticResource CkMuted}"
+              <TextBlock x:Name="NoTicketText" Text="Aucune action en cours. Note-la dans TDfocus, ou « + Ticket »." Foreground="{StaticResource CkMuted}"
                          TextWrapping="Wrap" Margin="0,12,0,2"/>
 
               <!-- Ce qui vient de se passer, avec « Annuler » pendant quelques secondes. -->
@@ -347,8 +512,61 @@
               </Grid>
             </StackPanel>
           </Border>
+
+          <!-- 4. Projets : lus dans le panneau Projets de TDfocus. -->
+          <Border x:Name="ProjectsCard" Style="{StaticResource CkCardBox}">
+            <StackPanel>
+              <Grid Margin="0,0,0,2">
+                <TextBlock x:Name="ProjectsTitle" Text="PROJETS" Style="{StaticResource CkTitle}" Margin="0" VerticalAlignment="Center"/>
+                <Button x:Name="BtnProjectsManage" Style="{StaticResource CkButton}" HorizontalAlignment="Right" Content="Gérer"
+                        ToolTip="Ouvrir le panneau Projets de TDfocus : pas, échéance, blocage, bloc à planifier"/>
+              </Grid>
+              <StackPanel x:Name="ProjectList"/>
+              <TextBlock x:Name="ProjectsEmpty" Text="Aucun projet en cours. Crée-le dans TDfocus (bouton Projets)." Foreground="{StaticResource CkMuted}"
+                         TextWrapping="Wrap" Margin="0,6,0,2" Visibility="Collapsed"/>
+            </StackPanel>
+          </Border>
+
+          <!-- 5. Relances du jour (tickets et projets mélangés) et prochaine réunion. -->
+          <Border x:Name="FollowCard" Style="{StaticResource CkCardBox}">
+            <StackPanel>
+              <TextBlock Text="RELANCES DU JOUR" Style="{StaticResource CkTitle}" Margin="0,0,0,4"/>
+              <StackPanel x:Name="FollowList"/>
+              <TextBlock x:Name="FollowEmpty" Text="Aucune relance à faire aujourd'hui." Foreground="{StaticResource CkMuted}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+              <Border Height="1" Background="{StaticResource CkLine}" Margin="0,10,0,10"/>
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CkMuted}"><Run x:Name="MeetingLabel" Text="Prochaine réunion : "/><Run x:Name="MeetingWhat" Text="" FontWeight="SemiBold" Foreground="{StaticResource CkText}"/><Run x:Name="MeetingDelay" Text=""/></TextBlock>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </ScrollViewer>
+
+      <!-- « Où j'en étais » et « Récap du jour » : un panneau qui recouvre le contenu, le temps de lire. -->
+      <Border x:Name="InfoOverlay" Grid.Row="1" Margin="0,10,0,0" Background="{StaticResource CkBg}" Visibility="Collapsed">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+          <Border Style="{StaticResource CkCardBox}" VerticalAlignment="Top">
+            <StackPanel>
+              <Grid Margin="0,0,0,6">
+                <TextBlock x:Name="InfoTitle" Text="" Style="{StaticResource CkTitle}" Margin="0" VerticalAlignment="Center"/>
+                <Button x:Name="BtnInfoClose" Style="{StaticResource CkButton}" HorizontalAlignment="Right" Content="Fermer"/>
+              </Grid>
+              <StackPanel x:Name="InfoList"/>
+            </StackPanel>
+          </Border>
+        </ScrollViewer>
+      </Border>
+
+      <!-- 6. Boutons du bas, toujours visibles. -->
+      <Grid Grid.Row="2" Margin="0,10,0,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="8"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Button x:Name="BtnWhere" Style="{StaticResource CkButton}" Content="Où j'en étais" Background="{StaticResource CkCard}"
+                ToolTip="Retrouver le fil : la tâche en cours, son étape, sa note, et la note de reprise de chaque projet"/>
+        <Button x:Name="BtnRecap" Grid.Column="2" Style="{StaticResource CkButton}" Content="Récap du jour" Background="{StaticResource CkCard}"
+                ToolTip="Ce qui est fait aujourd'hui, le temps passé, ce qui attend"/>
+      </Grid>
     </Grid>
   </Border>
 </Window>

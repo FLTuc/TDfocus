@@ -5,14 +5,16 @@
 #   - le cockpit : en-tête avec la date et l'heure, bouton « réduire en bulle », puis les cartes.
 # « Toujours au-dessus » = propriété Topmost des fenêtres WPF (voir les fichiers .xaml).
 # Les calculs (positions, tailles) sont dans src\Core\Cockpit.ps1 ; ici, on ne fait qu'afficher.
-# La carte « Tickets » est dans CockpitTickets.ps1.
+# La carte « Tickets » est dans CockpitTickets.ps1 ; projets, relances et mode projet dans CockpitProjects.ps1.
+# Rien n'est saisi dans le cockpit lui-même : il lit la liste et les projets de TDfocus.
 #
 # Tout est rangé dans $script:Td.Cockpit :
 #   Bubble, Panel         les deux fenêtres
 #   BubbleEls, PanelEls   leurs éléments nommés (x:Name dans le XAML)
 #   Anchor                le coin de l'écran où se trouve la bulle (voir Get-TdCockpitAnchor)
 #   Clock                 la dernière heure affichée (pour ne redessiner que si elle change)
-#   ListKind, Undo, MessageUntil, Chrono   la carte Tickets (voir CockpitTickets.ps1)
+#   ListKind, Undo, MessageUntil, Chrono, AlertId, AlertElapsed   la carte Tickets (voir CockpitTickets.ps1)
+#   Interrupted, BlockNote, BlockSignalId, BlockText, InfoKind    projets et mode projet (voir CockpitProjects.ps1)
 
 function Initialize-TdCockpit {
     # Construit les deux fenêtres, sans les afficher. En cas de problème, TDfocus continue sans cockpit.
@@ -36,9 +38,17 @@ function Initialize-TdCockpit {
             Undo      = $null
             MessageUntil = [long]0
             Chrono    = ''
+            AlertId   = $null
+            AlertElapsed = [long]0
+            Interrupted = $false
+            BlockNote = $false
+            BlockSignalId = $null
+            BlockText = ''
+            InfoKind  = $null
         }
         Register-TdCockpitEvents
         Register-TdCockpitTicketEvents
+        Register-TdCockpitProjectEvents
     }
     catch {
         $script:Td.Cockpit = $null
@@ -282,26 +292,27 @@ function Complete-TdCockpitPanelMove {
 # ---------------------------------------------------------------- mise à jour (appelée par le minuteur de TDfocus)
 
 function Update-TdCockpit {
-    # Appelée 4 fois par seconde par le minuteur de TDfocus, et après chaque action (-Force).
+    # Appelée 4 fois par seconde par le minuteur de TDfocus, et après chaque changement de la liste (-Force).
     param([Parameter(Mandatory)][long]$NowMs, [switch]$Force)
     $ck = $script:Td.Cockpit
     if (-not $ck) { return }
-    $store = $script:Td.Data.tickets
+    $state = Get-TdState
+    $projects = $script:Td.Data.projects
 
-    # 1. Les chronos, toujours (même cockpit réduit ou masqué) : un seul à la fois, alerte à la limite.
+    # 1. Alerte, toujours (même cockpit réduit ou masqué) : le ticket en cours vient-il de franchir la limite ?
     $changed = $false
-    $paused = Sync-TdChronos -State (Get-TdState) -Store $store
-    if ($paused) {
-        Show-TdChronoPaused -What $paused
-        $changed = $true
-    }
-    $ticket = Get-TdCurrentTicket $store
-    if ($ticket -and $null -ne $ticket.runningSince) {
-        if (Test-TdTicketAlert -Ticket $ticket -NowMs $NowMs -Minutes ([int]$script:Td.Data.settings.cockpit.ticketAlertMinutes)) {
-            Send-TdTicketAlert -Ticket $ticket
+    $ticket = Get-TdCurrentTicket $state
+    if ($ticket) {
+        $elapsed = Get-TdElapsedMs $ticket $NowMs
+        $minutes = [int](Get-TdSettings).cockpit.ticketAlertMinutes
+        if ($ck.AlertId -eq $ticket.id -and $null -ne $ticket.runningSince -and (Test-TdLimitCrossed -BeforeMs $ck.AlertElapsed -AfterMs $elapsed -Minutes $minutes)) {
+            Send-TdTicketAlert -Task $ticket
             $changed = $true
         }
+        $ck.AlertId = $ticket.id
+        $ck.AlertElapsed = $elapsed
     }
+    else { $ck.AlertId = $null }
     if ($ck.MessageUntil -gt 0 -and $NowMs -ge $ck.MessageUntil) { Hide-TdTicketMessage }
 
     # 2. L'affichage complet : quand la minute change, ou tout de suite si quelque chose a changé.
@@ -311,10 +322,88 @@ function Update-TdCockpit {
         $panelEls = $ck.PanelEls
         $panelEls.DateText.Text = Format-TdCockpitDate $NowMs
         $panelEls.TimeText.Text = [string][char]0x00B7 + ' ' + $clock
-        Update-TdCockpitTickets -NowMs $NowMs
+        $counts = Get-TdTicketCounts -State $state -NowMs $NowMs
+        $block = Get-TdProjectBlockInfo -State $state -Projects $projects -NowMs $NowMs
+        $followUps = @(Get-TdFollowUps -State $state -Projects $projects -NowMs $NowMs)
+        Update-TdCockpitBalance -NowMs $NowMs
+        Update-TdCockpitMode -NowMs $NowMs -Block $block -Counts $counts
+        Update-TdCockpitTickets -NowMs $NowMs -Counts $counts
+        Update-TdCockpitProjects -NowMs $NowMs -Block $block -FollowUps $followUps
+        Update-TdCockpitInfo -NowMs $NowMs
+        Update-TdCockpitBubble -NowMs $NowMs -Counts $counts -Block $block -FollowUpCount $followUps.Count
         return
     }
 
-    # 3. Entre deux, seul le chrono du ticket en cours avance (si le cockpit est ouvert).
-    if ($ck.Panel.IsVisible) { Update-TdTicketChrono -NowMs $NowMs }
+    # 3. Entre deux, seuls les chronos avancent (si le cockpit est ouvert).
+    if ($ck.Panel.IsVisible) {
+        Update-TdTicketChrono -NowMs $NowMs
+        Update-TdBlockChrono -NowMs $NowMs
+    }
+}
+
+function Update-TdCockpitBalance {
+    # Jauge « Équilibre du jour » : temps d'aujourd'hui sur les tickets (bleu) et les projets (orange),
+    # repère de l'objectif, phrase si un côté passe derrière. Le calcul est dans Core\Balance.ps1.
+    param([Parameter(Mandatory)][long]$NowMs)
+    $panelEls = $script:Td.Cockpit.PanelEls
+    $share = [int](Get-TdSettings).cockpit.ticketShare
+    $balance = Get-TdDayBalance -State (Get-TdState) -NowMs $NowMs -TicketShare $share
+    $star = [System.Windows.GridUnitType]::Star
+    $panelEls.BalanceTarget.Text = Format-TdBalanceTarget -TicketShare $share
+    $panelEls.BalanceTicketsText.Text = 'Tickets ' + (Format-TdDurationMs $balance.ticketMs)
+    $panelEls.BalanceProjectsText.Text = 'Projets ' + (Format-TdDurationMs $balance.projectMs)
+    # Le repère de l'objectif : à 60 % de la largeur pour « 60 / 40 ».
+    $panelEls.BalanceMarkLeft.Width = [System.Windows.GridLength]::new($share, $star)
+    $panelEls.BalanceMarkRight.Width = [System.Windows.GridLength]::new(100 - $share, $star)
+    # Les deux parts de la barre (rien n'est dessiné tant que rien n'est mesuré).
+    Set-TdCockpitVisible $panelEls.BalanceBar ($balance.totalMs -gt 0)
+    if ($balance.totalMs -gt 0) {
+        $ratio = [double]$balance.ticketRatio
+        $panelEls.BalanceTicketsCol.Width = [System.Windows.GridLength]::new($ratio, $star)
+        $panelEls.BalanceProjectsCol.Width = [System.Windows.GridLength]::new(1 - $ratio, $star)
+        # Bouts arrondis : une part seule est arrondie des deux côtés.
+        $left = [System.Windows.CornerRadius]::new(5, 0, 0, 5)
+        $right = [System.Windows.CornerRadius]::new(0, 5, 5, 0)
+        if ($balance.projectMs -le 0) { $left = [System.Windows.CornerRadius]::new(5) }
+        if ($balance.ticketMs -le 0) { $right = [System.Windows.CornerRadius]::new(5) }
+        $panelEls.BalanceTicketsFill.CornerRadius = $left
+        $panelEls.BalanceProjectsFill.CornerRadius = $right
+    }
+    # La phrase prend la couleur du côté qui passe derrière.
+    $panelEls.BalanceMessage.Text = [string]$balance.message
+    Set-TdCockpitVisible $panelEls.BalanceMessage ([bool]$balance.message)
+    $color = 'CkProjects'
+    if ($balance.behind -eq 'tickets') { $color = 'CkTickets' }
+    $panelEls.BalanceMessage.Foreground = Get-TdCockpitBrush $color
+}
+
+function Update-TdCockpitBubble {
+    # La bulle : nombre de tickets fermés aujourd'hui, pastille orange si une relance est due (ticket ou projet),
+    # contour bleu quand le minuteur d'un ticket tourne (couleur d'alerte au-delà de la limite), orange pendant un bloc projet.
+    param([Parameter(Mandatory)][long]$NowMs, [Parameter(Mandatory)]$Counts, $Block, [int]$FollowUpCount)
+    $bubbleEls = $script:Td.Cockpit.BubbleEls
+    $closed = [int]$Counts.closedToday
+    $bubbleEls.BubbleCount.Text = [string]$closed
+    $word = 'fermés'
+    if ($closed -le 1) { $word = 'fermé' }
+    $bubbleEls.BubbleLabel.Text = $word
+    Set-TdCockpitVisible $bubbleEls.BubbleDot ($FollowUpCount -gt 0)
+
+    $ring = 'CkRing'
+    $what = ''
+    $ticket = Get-TdCurrentTicket (Get-TdState)
+    if ($Block -and $Block.running) {
+        $ring = 'CkProjects'
+        $what = ' Bloc projet en cours : ' + (Limit-TdText ([string]$Block.name) 40) + '.'
+    }
+    elseif ($ticket -and $null -ne $ticket.runningSince) {
+        $ring = 'CkTickets'
+        $what = ' En cours : ' + (Limit-TdText ([string]$ticket.title) 40) + '.'
+        if (Test-TdTicketOverTime -Task $ticket -NowMs $NowMs -Minutes ([int](Get-TdSettings).cockpit.ticketAlertMinutes)) { $ring = 'CkAlert' }
+    }
+    $bubbleEls.BubbleButton.BorderBrush = Get-TdCockpitBrush $ring
+    $summary = "$closed $word aujourd'hui, $($Counts.open) ouverts."
+    if ($FollowUpCount -gt 0) { $summary += " Relances à faire : $FollowUpCount." }
+    $bubbleEls.BubbleButton.ToolTip = [string]($summary + $what + ' Clic : ouvrir le cockpit. Glisser : déplacer la bulle.')
+    [System.Windows.Automation.AutomationProperties]::SetName($bubbleEls.BubbleButton, 'Cockpit TDfocus : ' + $summary + $what)
 }

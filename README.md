@@ -210,48 +210,62 @@ Pourquoi ces choix :
 
 ![Actions du quotidien et leurs jours](docs/captures/quotidien.png)
 
-### Cockpit flottant (helpdesk et projets) — en construction
+### Cockpit flottant (helpdesk et projets)
 
 Une **bulle ronde**, toujours au-dessus des autres fenêtres, qui s'ouvre en un **cockpit**
-pensé pour le helpdesk et la gestion de projet. Il est livré étape par étape.
+pensé pour le helpdesk et la gestion de projet.
 
-**Étape 1 (disponible)** : la bulle et la fenêtre.
+**Principe : rien n'est saisi ailleurs que dans TDfocus.** Le cockpit lit ta liste et tes
+projets TDfocus, que tu remplis à la main comme d'habitude. Il n'est relié à aucun outil de
+ticketing et n'a aucune liste à part.
 
-- La bulle (84 px) se déplace en la faisant glisser ; sa place est mémorisée.
-- Un clic l'ouvre en cockpit (420 × 860, ou moins haut sur un petit écran : le contenu défile).
-  Le cockpit s'ouvre du côté de l'écran où se trouve la bulle, et se déplace par son en-tête.
-- Le bouton en haut à droite le **réduit en bulle**.
-- Clic droit sur la bulle : ouvrir le cockpit, ouvrir TDfocus, ou **masquer la bulle**. Pour la
-  retrouver : icône TDfocus près de l'horloge ▸ **Cockpit**, ou Réglages ▸ Confort.
-- Thème sombre fixe et police Inter (fournie avec TDfocus, rien à installer).
+| Dans le cockpit | Ce que c'est dans TDfocus |
+|---|---|
+| un **ticket** | une action de ta liste (tout, sauf les blocs projet et les pauses) |
+| le **ticket en cours** et son chrono | la tâche en cours et son minuteur |
+| **fermés aujourd'hui** | les tâches validées aujourd'hui |
+| un **projet**, son %, son jalon | un projet du panneau Projets, ses pas, son prochain pas |
+| un **bloc projet** | un bloc ajouté ou planifié depuis le panneau Projets |
+| la **prochaine réunion** | la prochaine action à heure fixe (`Point d'équipe 30 @15h30`) |
 
-**Étape 2 (disponible)** : les tickets.
+**La bulle** (84 px) se déplace en la faisant glisser. Elle affiche le nombre d'actions fermées
+aujourd'hui. Contour bleu : le minuteur d'un ticket tourne. Contour orange : un bloc projet est
+en cours. **Pastille orange** : une relance est à faire aujourd'hui. Un clic ouvre le cockpit.
 
-![Cockpit, étape 2 : ticket en cours, alerte à 30 min, liste à relancer, bulle](docs/captures/cockpit-tickets.png)
+**Le cockpit ouvert** (420 × 860, moins haut sur un petit écran : le contenu défile), de haut en bas :
+
+1. **Date, heure** et bouton « réduire en bulle ». On déplace le cockpit par cet en-tête.
+2. **Équilibre du jour**, toujours en haut : barre bleue (tickets) et orange (projets), temps de
+   chaque côté, repère de l'objectif (60 / 40 par défaut). Si un côté passe derrière de plus de
+   10 points, une phrase le dit : « Les projets passent derrière : un bloc de 45 min rééquilibrerait. »
+3. **Tickets** : trois tuiles (ouverts, fermés aujourd'hui, à relancer) qui ouvrent leur liste,
+   puis le ticket en cours : chrono, barre vers 30 min, **Démarrer / Pause**, **Escalader**, **Fermer**.
+   À 30 min : un tintement, puis la barre et le chrono changent de couleur, sans clignoter.
+4. **Projets** : avancement en %, prochain jalon, échéance (J-6), « Bloqué : en attente de… »,
+   et « Pas bougé depuis 3 jours » au-delà de 2 jours ouvrés sans travail dessus.
+5. **Relances du jour** (tickets et projets mélangés, bouton **Relancé**) et prochaine réunion.
+6. **Où j'en étais** (la tâche en cours, son étape, sa note, la note de reprise de chaque
+   projet) et **Récap du jour** (fermés, temps, escaladés, reste à faire).
 
 | Je veux… | Je fais |
 |---|---|
-| noter un ticket | **+ Ticket**, un numéro ou un sujet (facultatif), Entrée |
-| commencer | **Démarrer** : le chrono tourne, la barre avance vers 30 min |
-| souffler | **Pause**, puis **Reprendre** |
-| passer la main | **Escalader** : le ticket part dans « à relancer » (prochain jour ouvré) |
-| terminer | **Fermer** : « fermés aujourd'hui » et la bulle gagnent 1 |
-| revenir en arrière | **Annuler**, proposé quelques secondes après chaque action |
-| voir une liste | clic sur une tuile (ouverts, fermés aujourd'hui, à relancer) |
+| noter un ticket | je l'écris dans TDfocus (ou **+ Ticket** dans le cockpit : même saisie, même liste) |
+| le marquer urgent | j'ajoute `!!` : `INC-4830 Imprimante 15 !!` (il passe juste après la tâche en cours) |
+| passer la main | **Escalader** : l'action quitte la liste et revient le prochain jour ouvré, marquée « à relancer » |
+| noter une relance faite | **Relancé** : la suivante est repoussée au prochain jour ouvré |
+| reprendre un ticket escaladé | tuile « à relancer » ▸ **Reprendre** |
+| dire qu'un projet est bloqué | TDfocus ▸ Projets ▸ Détails ▸ **En attente de** (vide = débloqué) |
+| planifier un bloc projet | TDfocus ▸ Projets ▸ Détails ▸ **Bloc à** `14:00` ▸ Planifier |
+| revenir en arrière | **Annuler**, proposé quelques secondes après un ajout, une fermeture, une escalade |
 
-- **Un seul chrono à la fois** : démarrer un ticket met en pause la tâche TDfocus en cours, et
-  inversement. Aucune minute n'est comptée deux fois.
-- **Alerte douce à 30 min** : un tintement, puis la barre et le chrono changent de couleur, sans
-  clignoter. La durée se règle dans Réglages ▸ Confort (de 1 à 240 min).
-- **La bulle** affiche le nombre de tickets fermés aujourd'hui. Son contour est bleu quand le
-  chrono d'un ticket tourne ; une **pastille orange** signale une relance à faire aujourd'hui.
-- Les tickets sont saisis à la main et enregistrés sur le PC (`tickets.json`). Tout passe par
-  une **couche de données séparée** (`src/Core/Tickets.ps1`) : pour brancher plus tard l'outil
-  de ticketing, il suffira d'appeler `Merge-TdExternalTickets` avec la liste lue dans son API,
-  sans toucher à l'affichage.
+**Mode projet.** À l'heure d'un bloc planifié, le cockpit l'annonce (signal doux) et propose
+**Commencer**. Dès qu'un bloc projet est la tâche en cours : bordure et titre orange, temps
+restant, tâche projet en grand avec sa checklist et la dernière note « Où j'en étais », autres
+projets en résumé, et les tickets réduits à **une ligne** (« Tickets · 7 ouverts · 1 urgent »).
+Le bouton **Interrompre** met le bloc en pause, ouvre la note de reprise et montre les tickets.
 
-À venir : jauge « Équilibre du jour », projets, relances, blocs projet,
-note « Où j'en étais » et récap du jour.
+Réglages ▸ Confort : afficher ou masquer la bulle, durée avant l'alerte d'un ticket (1 à 240 min),
+part de temps visée pour les tickets (10 à 90 %). Thème sombre fixe, police Inter fournie.
 
 **Limites du « toujours au-dessus »** (propriété `Topmost` de Windows) : la bulle ne passe pas
 au-dessus du menu Démarrer, de l'écran de verrouillage, des demandes d'autorisation
@@ -387,15 +401,16 @@ src/
   Core/                logique pure, testée : tâches et sous-étapes, projection horaire, saisie
                        rapide, routines, statistiques, imports (iCal, Todoist, Notion, texte),
                        notes, signaux (atterrissage, fin, carillon), points de contrôle, revue,
-                       projets au long cours et actions du quotidien, tickets du cockpit
-                       (Tickets.ps1 : la couche de données, prête pour une future API)
+                       projets au long cours et actions du quotidien ; pour le cockpit :
+                       Tickets.ps1 (les tickets = les actions de la liste), Balance.ps1 (jauge),
+                       CockpitData.ps1 (projets, relances, réunion, bloc projet, récap)
   Storage.ps1          persistance JSON atomique, sauvegardes, chiffrement des jetons
   Audio/               synthèse sonore (PowerShell pur) et lecture
   Platform/            Windows (clé Run, lanceur TDfocus.exe, imports réseau) et Linux (XDG,
                        émulateurs de terminal, notifications)
   UI/                  Windows : fenêtre XAML, thèmes, vue principale, liste, panneaux,
-                       cockpit flottant (Cockpit.ps1, CockpitTickets.ps1, CockpitBubble.xaml,
-                       CockpitPanel.xaml)
+                       cockpit flottant (Cockpit.ps1, CockpitTickets.ps1, CockpitProjects.ps1,
+                       CockpitBubble.xaml, CockpitPanel.xaml)
   Terminal/            Linux : texte et couleurs, écrans, clavier et minuteur, sons
 assets/                icône, police Inter du cockpit (assets/fonts, licence OFL)
 tests/                 tests Pester (cœur, fonctionnalités, imports, terminal, dépôt) et test d'interface
@@ -421,8 +436,10 @@ Invoke-Pester -Path tests
   d'accumulation au changement de jour).
 - `tests/Cockpit.Tests.ps1` : cockpit flottant (place de la bulle, taille et place du cockpit
   selon l'écran, réglages).
-- `tests/Tickets.Tests.ps1` : tickets du cockpit (ajout, chrono et temps par jour, un seul
-  chrono à la fois, alerte, fermer, escalader, relancer, annuler, enregistrement).
+- `tests/Tickets.Tests.ps1` : cockpit, tickets lus dans la liste (urgence `!!`, temps par jour,
+  compteurs, limite de 30 min, escalader, relancer, reprendre) et jauge « Équilibre du jour ».
+- `tests/CockpitData.Tests.ps1` : cockpit, projets (avancement, jalon, blocage, « pas bougé »),
+  relances du jour, prochaine réunion, bloc projet, « Où j'en étais », récap du jour.
 - `tests/Terminal.Tests.ps1` : version Linux (largeur des caractères, écrans à toutes les
   tailles, clavier, minuteur, intégration XDG).
 - `tools/test_tui_pty.py` : lance la version Linux dans un vrai pseudo-terminal, la pilote au

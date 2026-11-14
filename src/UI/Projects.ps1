@@ -96,6 +96,9 @@ function New-TdProjectCard {
     }
     $summary = Get-TdProjectSummary -Project $Project -NowMs $NowMs
     if ($summary) { [void]$stack.Children.Add((New-TdText -Text $summary -Size 12 -Brush 'MutedBrush' -Wrap -Margin '0,3,0,0')) }
+    if ($Project.blockedBy -and $Project.status -eq 'active') {
+        [void]$stack.Children.Add((New-TdText -Text ('Bloqué : en attente de ' + $Project.blockedBy) -Size 12 -Brush 'OvertimeBrush' -Wrap -Margin '0,3,0,0'))
+    }
 
     if ($Project.status -ne 'done') {
         $next = @(Get-TdProjectPendingSteps $Project 1)
@@ -206,8 +209,16 @@ function Add-TdProjectDetails {
     $due.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { Set-TdProjectDeadlineFromBox $s; $e.Handled = $true } })
     [void]$details.Children.Add((New-TdLabeledRow -Label 'Échéance' -Control $due))
 
+    # Bloqué : en attente de quelqu'un. Le cockpit l'affiche et proposera de relancer.
+    $blocked = New-TdTextBox -Text $Project.blockedBy -Margin '0,0,0,8'
+    $blocked.Tag = $id
+    $blocked.ToolTip = 'Facultatif. Ex. « la validation RSSI ». Vide = le projet n''est pas bloqué.'
+    $blocked.Add_LostFocus({ param($s, $e) Set-TdProjectBlockedFromBox $s })
+    $blocked.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { Set-TdProjectBlockedFromBox $s; $e.Handled = $true } })
+    [void]$details.Children.Add((New-TdLabeledRow -Label 'En attente de' -Control $blocked))
+
     $blocks = New-TdPanel -Wrap
-    foreach ($m in @(15, 25, 45, 60)) {
+    foreach ($m in @(15, 25, 45, 60, 90)) {
         $chip = New-TdChip -Content "$m min" -Group "Block$id" -Checked ([int]$Project.blockMinutes -eq $m) -Tag "$id|$m" -OnClick {
             $p = ([string]$this.Tag).Split('|')
             $project = Find-TdProject $script:Td.Data.projects $p[0]
@@ -217,6 +228,18 @@ function Add-TdProjectDetails {
         [void]$blocks.Children.Add($chip)
     }
     [void]$details.Children.Add((New-TdLabeledRow -Label 'Bloc' -Control $blocks))
+
+    # Planifier un bloc à heure fixe (ex. 14:00) : il apparaît dans la journée, et le cockpit l'annonce à l'heure dite.
+    $planRow = New-TdPanel -Orientation 'Horizontal'
+    $planBox = New-TdTextBox -Margin '0,0,6,8' -Width 80
+    $planBox.Tag = $id
+    $planBox.ToolTip = 'Heure de début du bloc, ex. 14:00 ou 14h. Puis Entrée, ou « Planifier ».'
+    $planBox.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { Add-TdProjectBlockAt -Box $s; $e.Handled = $true } })
+    [void]$planRow.Children.Add($planBox)
+    $planButton = New-TdButton -Content 'Planifier' -Margin '0,0,0,8' -OnClick { Add-TdProjectBlockAt -Box $this.Tag }
+    $planButton.Tag = [System.Windows.Controls.TextBox]$planBox
+    [void]$planRow.Children.Add($planButton)
+    [void]$details.Children.Add((New-TdLabeledRow -Label 'Bloc à' -Control $planRow))
 
     $actions = New-TdPanel -Wrap -Margin '0,8,0,0'
     if ($Project.status -eq 'active') {
@@ -231,7 +254,7 @@ function Add-TdProjectDetails {
     [void]$actions.Children.Add((New-TdButton -Content 'Supprimer' -Style 'GhostButton' -Margin '0,0,0,4' -Tag $id -OnClick { Remove-TdProjectNow -Id ([string]$this.Tag) }))
     [void]$details.Children.Add($actions)
     # Les champs ont le fond des cartes : on les éclaircit pour qu'ils restent visibles.
-    foreach ($box in @($stepBox, $crumb, $due)) { $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush') }
+    foreach ($box in @($stepBox, $crumb, $due, $blocked, $planBox)) { $box.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'SurfaceBrush') }
     [void]$Panel.Children.Add($details)
 
     $focus = $script:Td.FocusProjectBox
@@ -255,6 +278,38 @@ function Set-TdProjectDeadlineFromBox {
     Save-TdProjectsNow
     Update-TdDrawer
     Update-TdView
+}
+
+function Set-TdProjectBlockedFromBox {
+    # « En attente de… » : un texte bloque le projet (le cockpit proposera de relancer), un champ vide le débloque.
+    param([Parameter(Mandatory)]$Box)
+    $project = Find-TdProject $script:Td.Data.projects ([string]$Box.Tag)
+    if (-not $project) { return }
+    $text = ([string]$Box.Text).Trim()
+    if ($project.blockedBy -eq $text) { return }
+    Set-TdProjectBlocked -Project $project -Reason $text -NowMs (Get-TdNowMs)
+    Save-TdProjectsNow
+    Update-TdDrawer
+    Update-TdView
+}
+
+function Add-TdProjectBlockAt {
+    # Planifie un bloc du projet à heure fixe (champ « Bloc à »).
+    param([Parameter(Mandatory)]$Box)
+    $project = Find-TdProject $script:Td.Data.projects ([string]$Box.Tag)
+    if (-not $project) { return }
+    $clock = ConvertTo-TdClockText ([string]$Box.Text)
+    if (-not $clock) {
+        Show-TdToast -Text 'Heure non comprise : écris par exemple 14:00.'
+        return
+    }
+    $now = Get-TdNowMs
+    $task = New-TdProjectBlockTask -Project $project -NowMs $now
+    $task.fixedStart = $clock
+    Add-TdTask -State (Get-TdState) -Task $task -NowMs $now
+    Complete-TdChange -Replan
+    Update-TdDrawer
+    Show-TdToast -Text ('Bloc de {0} pour « {1} » planifié à {2}.' -f (Format-TdMinutes $project.blockMinutes), (Limit-TdText $project.name 30), $clock)
 }
 
 function New-TdProjectFromForm {

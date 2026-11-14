@@ -4,13 +4,20 @@
 #   "Rapport 1h30"                 -> 90 min
 #   "Appeler la banque 10min @14h" -> 10 min, créneau figé à 14:00
 #   "Réunion d'équipe à 9h30 45m"  -> 45 min, créneau figé à 09:30
+#   "INC-4830 Imprimante 20 !!"    -> 20 min, urgente (elle passera avant les autres)
 
 function ConvertFrom-TdQuickInput {
     param([string]$Text)
-    $result = [ordered]@{ title = ''; minutes = $null; fixedStart = $null }
+    $result = [ordered]@{ title = ''; minutes = $null; fixedStart = $null; urgent = $false }
     if ([string]::IsNullOrWhiteSpace($Text)) { return [pscustomobject]$result }
 
     $s = ' ' + ($Text.Trim() -replace '\s+', ' ') + ' '
+
+    # Urgence : « !! » n'importe où dans la saisie (un seul « ! » reste de la ponctuation).
+    if ($s -match '!!') {
+        $result.urgent = $true
+        $s = $s -replace '\s*!{2,}', ' '
+    }
 
     # Heure fixe : "@14h", "@14:30", "@9", "à 14h30"
     $fixedPatterns = @(

@@ -92,6 +92,8 @@ function ConvertTo-TdProject {
     if ($null -eq $invested -or $invested -lt 0) { $invested = 0 }
     $created = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'createdAt')
     if ($null -eq $created) { $created = 0 }
+    $followUp = ConvertTo-TdNullableString (Get-TdValue $InputObject 'followUpOn')
+    if ($followUp -and $followUp -notmatch '^\d{4}-\d{2}-\d{2}$') { $followUp = $null }
     [pscustomobject][ordered]@{
         id           = $id
         name         = ([string](Get-TdValue $InputObject 'name')).Trim()
@@ -108,6 +110,8 @@ function ConvertTo-TdProject {
         investedMs   = [long]$invested
         sessions     = [int](Get-TdValue $InputObject 'sessions')
         doneAt       = ConvertTo-TdNullableLong (Get-TdValue $InputObject 'doneAt')
+        blockedBy    = ([string](Get-TdValue $InputObject 'blockedBy')).Trim()   # « bloqué : en attente de… » (vide = pas bloqué)
+        followUpOn   = $followUp                                                 # jour de la prochaine relance (« 2026-11-16 »)
     }
 }
 
